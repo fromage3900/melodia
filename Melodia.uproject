@@ -1,0 +1,213 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "{BD87611D-456E-C0A5-7B38-0780DD024FA7}",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "MelodiaMelusina_PROD",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ModelingToolsEditorMode",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "LocationServicesIOSImpl",
+			"Enabled": true
+		},
+		{
+			"Name": "IOSReplayKit",
+			"Enabled": true
+		},
+		{
+			"Name": "HDRIBackdrop",
+			"Enabled": true
+		},
+		{
+			"Name": "LidarPointCloud",
+			"Enabled": true,
+			"SupportedTargetPlatforms": [
+				"Win64",
+				"Mac",
+				"Linux"
+			]
+		},
+		{
+			"Name": "NaniteAssemblyEditorUtils",
+			"Enabled": true
+		},
+		{
+			"Name": "NaniteDisplacedMesh",
+			"Enabled": true
+		},
+		{
+			"Name": "VirtualHeightfieldMesh",
+			"Enabled": true
+		},
+		{
+			"Name": "DynamicWind",
+			"Enabled": true
+		},
+		{
+			"Name": "BlueprintMaterialTextureNodes",
+			"Enabled": true
+		},
+		{
+			"Name": "Avalanche",
+			"Enabled": true,
+			"SupportedTargetPlatforms": [
+				"Win64",
+				"Linux",
+				"Mac"
+			]
+		},
+		{
+			"Name": "StaticMeshEditorModeling",
+			"Enabled": true
+		},
+		{
+			"Name": "CelestialVault",
+			"Enabled": true
+		},
+		{
+			"Name": "ChaosClothAsset",
+			"Enabled": true
+		},
+		{
+			"Name": "ChaosClothAssetEditor",
+			"Enabled": true
+		},
+		{
+			"Name": "ChaosOutfitAsset",
+			"Enabled": true
+		},
+		{
+			"Name": "CameraShakePreviewer",
+			"Enabled": false
+		},
+		{
+			"Name": "GameplayCameras",
+			"Enabled": false
+		},
+		{
+			"Name": "GameFeatures",
+			"Enabled": true
+		},
+		{
+			"Name": "AbilitySystemGameFeatureActions",
+			"Enabled": true
+		},
+		{
+			"Name": "PCG",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGNaniteAssembliesInterop",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGBiomeSample",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGBiomeCore",
+			"Enabled": true
+		},
+		{
+			"Name": "Water",
+			"Enabled": true
+		},
+		{
+			"Name": "WaterAdvanced",
+			"Enabled": true
+		},
+		{
+			"Name": "WaterExtras",
+			"Enabled": true
+		},
+		{
+			"Name": "Buoyancy",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGWaterInterop",
+			"Enabled": true
+		},
+		{
+			"Name": "NiagaraNanite",
+			"Enabled": true
+		},
+		{
+			"Name": "HairCardGenerator",
+			"Enabled": true
+		},
+		{
+			"Name": "Locomotor",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGNiagaraInterop",
+			"Enabled": true
+		},
+		{
+			"Name": "ProceduralVegetationEditor",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGPythonInterop",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGFastGeoInterop",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimationLocomotionLibrary",
+			"Enabled": true
+		},
+		{
+			"Name": "ChaosClothGenerator",
+			"Enabled": true
+		},
+		{
+			"Name": "ChaosMover",
+			"Enabled": true
+		},
+		{
+			"Name": "Harmonix",
+			"Enabled": true
+		},
+		{
+			"Name": "KawaiiPhysics",
+			"Enabled": true,
+			"MarketplaceURL": "com.epicgames.launcher://ue/Fab/product/f870c07e-0a02-4a78-a888-e52a22794572"
+		},
+		{
+			"Name": "MetasoundExperimental",
+			"Enabled": true
+		},
+		{
+			"Name": "MIDIDevice",
+			"Enabled": true
+		},
+		{
+			"Name": "PanoramicCapture",
+			"Enabled": true
+		},
+		{
+			"Name": "Soundscape",
+			"Enabled": true
+		},
+		{
+			"Name": "TextureGraph",
+			"Enabled": true
+		}
+	]
+}

@@ -1,0 +1,18 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "MooaToon",
+	"Description": "The Ultimate Solution for Cinematic Toon Rendering in UE5",
+	"Category": "Rendering",
+	"CreatedBy": "Jason Ma",
+	"CreatedByURL": "https://github.com/JasonMa0012/MooaToon",
+	"DocsURL": "https://mooatoon.com/docs/getting-started",
+	"MarketplaceURL": "",
+	"SupportURL": "https://github.com/JasonMa0012/MooaToon/issues",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"EnabledByDefault": true
+}
