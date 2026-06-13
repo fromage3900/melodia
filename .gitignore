@@ -28,4 +28,8 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
+# Diversion metadata (if using Diversion instead of GitHub)
+.diversion/
+.dvignore
+
 # Keep these (do NOT ignore): Config/, Content/, Source/, *.uproject, .gitattributes, Docs/
