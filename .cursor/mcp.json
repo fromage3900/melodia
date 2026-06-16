@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "unrealMCP": {
+      "command": "C:\\Users\\froma\\.local\\bin\\uv.exe",
+      "args": [
+        "--directory",
+        "C:\\Users\\froma\\it-is-unreal\\server",
+        "run",
+        "it_is_unreal.py"
+      ],
+      "env": {
+        "UNREAL_HOST": "127.0.0.1",
+        "UNREAL_PORT": "55557"
+      }
+    }
+  }
+}

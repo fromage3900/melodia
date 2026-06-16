@@ -1,0 +1,90 @@
+{
+  "version": "2026-06-15",
+  "description": "Melusina baroque architecture mesh palette for PCGEx mesh collections. Canonical paths under /Game/_PROJECT/. Prefer MelusinasHouse duplicates when both exist.",
+  "materials": {
+    "facade_primary": "/Game/_PROJECT/04_Materials/MooaToon/M_SDF_TrueParallax",
+    "facade_gold": "/Game/_PROJECT/04_Materials/MooaToon/M_OilPainting_Gold_Baroque",
+    "ornament_sdf": "/Game/_PROJECT/04_Materials/MooaToon/M_SDF_Baroque",
+    "stucco": "/Game/_PROJECT/04_Materials/MooaToon/M_SDF_GildedStucco",
+    "filigree": "/Game/_PROJECT/04_Materials/MooaToon/M_SDF_GildedFiligree"
+  },
+  "collections": {
+    "PCGCol_Baroque_Walls": {
+      "tag": "wall",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi", "weight": 3, "tags": ["base", "tall"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_001", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_011", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_012", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_013", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_014", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_015", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_016", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_017", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_018", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallhi_019", "weight": 2, "tags": ["variant"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallmid", "weight": 2, "tags": ["mid"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallmid_001", "weight": 2, "tags": ["mid"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallshort", "weight": 2, "tags": ["short"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallshort_001", "weight": 2, "tags": ["short"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallcurved", "weight": 1, "tags": ["curved"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_wallwindow", "weight": 1, "tags": ["window"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_wallz", "weight": 1, "tags": ["corner"] }
+      ]
+    },
+    "PCGCol_Baroque_Columns": {
+      "tag": "column",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_001", "weight": 1, "tags": ["shaft"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_002", "weight": 1, "tags": ["shaft"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_004", "weight": 1, "tags": ["shaft"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_005", "weight": 1, "tags": ["shaft"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_007", "weight": 1, "tags": ["shaft"] }
+      ],
+      "note": "Replace with dedicated column meshes when authored; cubes serve as modular shaft placeholders aligned to wallhi module grid (~400cm)."
+    },
+    "PCGCol_Baroque_Cornice": {
+      "tag": "cornice",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/houseassets/SM_MarbleSlabOutline", "weight": 2, "tags": ["band"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_MarbleSlabOutline_007", "weight": 2, "tags": ["band"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_ceilingsquare", "weight": 1, "tags": ["ceiling_tile"] }
+      ]
+    },
+    "PCGCol_Baroque_Roof": {
+      "tag": "roof",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/houseassets/SM_ROOF", "weight": 2, "tags": ["hip"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_SurrealRoof_HIP_002", "weight": 2, "tags": ["hip"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_SurrealRoof_HIP_001", "weight": 2, "tags": ["hip"] }
+      ]
+    },
+    "PCGCol_Baroque_Doors": {
+      "tag": "door",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Door_Swing_Annotation", "weight": 1, "tags": ["portal"] }
+      ]
+    },
+    "PCGCol_Baroque_Bridges": {
+      "tag": "bridge",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_venetianbridge", "weight": 1, "tags": ["span"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_corridor", "weight": 2, "tags": ["corridor"] }
+      ]
+    },
+    "PCGCol_Baroque_Towers": {
+      "tag": "tower",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_surrealtower1", "weight": 1, "tags": ["tower"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_surrealtower2", "weight": 1, "tags": ["tower"] }
+      ]
+    }
+  },
+  "module_grid_cm": {
+    "wall_width": 400,
+    "wall_height": 600,
+    "column_spacing": 400,
+    "max_step_height": 50,
+    "min_path_width": 200
+  }
+}
