@@ -9,6 +9,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "MelodiaRhythmGameModeBase.h"
 #include "MelodiaPCGEncounterSpawner.h"
+#include "PCG/MelodiaPCGDecorationSpawner.h"
+#include "MelodiaQuestManagerBase.h"
 #include "PCGGraph.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -77,6 +79,7 @@ void AMelodiaReverieRunManager::AdvanceToNextArea()
 	if (IsRunComplete())
 	{
 		RunState = EReverieRunState::Completed;
+		CleanupRunActors();
 		UE_LOG(LogTemp, Log, TEXT("ReverieRunManager: Run completed! All %d areas cleared."), AreasPerRun);
 		return;
 	}
@@ -91,6 +94,7 @@ void AMelodiaReverieRunManager::AbortRun()
 {
 	RunState = EReverieRunState::Failed;
 	GeneratedAreaSequence.Empty();
+	CleanupRunActors();
 	UE_LOG(LogTemp, Warning, TEXT("ReverieRunManager: Run aborted at area %d."), CurrentAreaIndex);
 }
 
@@ -116,6 +120,19 @@ void AMelodiaReverieRunManager::OnAreaGenerationComplete()
 
 	// Spawn encounters for this area using PCG-driven placement.
 	SpawnEncountersForCurrentArea();
+
+	// Spawn decorations for visual dressing.
+	SpawnDecorationsForCurrentArea();
+
+	// Notify quest system to rebuild PCG-driven markers.
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AMelodiaQuestManagerBase> It(World); It; ++It)
+		{
+			It->NotifyPCGRebuilt();
+			break;
+		}
+	}
 
 	// Notify the game mode that exploration is ready.
 	if (AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(this)))
@@ -303,11 +320,81 @@ void AMelodiaReverieRunManager::SpawnEncountersForCurrentArea()
 	if (ActiveEncounterSpawner)
 	{
 		ActiveEncounterSpawner->SetActorLocation(SpawnLoc);
-		ActiveEncounterSpawner->MaxEncounters = Area.MaxEncounters;
+		ActiveEncounterSpawner->MaxSpawnCount = Area.MaxEncounters;
 		const int32 Spawned = ActiveEncounterSpawner->ScanAndSpawn();
 
 		UE_LOG(LogTemp, Log,
 			TEXT("ReverieRunManager: Spawned %d encounters for area %d '%s'."),
 			Spawned, CurrentAreaIndex, *Area.AreaDisplayName);
 	}
+}
+
+// ---------------------------------------------------------------------------
+// SpawnDecorationsForCurrentArea
+// ---------------------------------------------------------------------------
+
+void AMelodiaReverieRunManager::SpawnDecorationsForCurrentArea()
+{
+	if (!GeneratedAreaSequence.IsValidIndex(CurrentAreaIndex))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// Find the PCG component to determine spawn location.
+	UPCGComponent* PCGComp = FindPCGComponent();
+	if (!PCGComp)
+	{
+		return;
+	}
+
+	const FVector SpawnLoc = PCGComp->GetOwner()->GetActorLocation();
+
+	// Find or create the decoration spawner.
+	if (!ActiveDecorationSpawner && DecorationSpawnerClass)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride =
+			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		ActiveDecorationSpawner = World->SpawnActor<AMelodiaPCGDecorationSpawner>(
+			DecorationSpawnerClass, SpawnLoc, FRotator::ZeroRotator, Params);
+	}
+
+	if (ActiveDecorationSpawner)
+	{
+		ActiveDecorationSpawner->SetActorLocation(SpawnLoc);
+		const int32 Spawned = ActiveDecorationSpawner->ScanAndSpawn();
+
+		UE_LOG(LogTemp, Log,
+			TEXT("ReverieRunManager: Spawned %d decorations for area %d."),
+			Spawned, CurrentAreaIndex);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// CleanupRunActors
+// ---------------------------------------------------------------------------
+
+void AMelodiaReverieRunManager::CleanupRunActors()
+{
+	if (ActiveEncounterSpawner && !ActiveEncounterSpawner->IsPendingKillPending())
+	{
+		ActiveEncounterSpawner->ClearSpawnedActors();
+		ActiveEncounterSpawner->Destroy();
+		ActiveEncounterSpawner = nullptr;
+	}
+
+	if (ActiveDecorationSpawner && !ActiveDecorationSpawner->IsPendingKillPending())
+	{
+		ActiveDecorationSpawner->ClearSpawnedActors();
+		ActiveDecorationSpawner->Destroy();
+		ActiveDecorationSpawner = nullptr;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("ReverieRunManager: Cleaned up run actors."));
 }

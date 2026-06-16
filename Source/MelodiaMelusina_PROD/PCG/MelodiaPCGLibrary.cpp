@@ -3,6 +3,8 @@
 
 #include "MelodiaPCGLibrary.h"
 
+#include "MelodiaPCGWalkableIndex.h"
+#include "../MelodiaPCGEncounterSpawner.h"
 #include "PCGComponent.h"
 #include "PCGGraph.h"
 #include "Data/PCGPointData.h"
@@ -348,4 +350,48 @@ TArray<FMelodiaWalkablePoint> UMelodiaPCGLibrary::GetWalkablePointsByRoleInRadiu
 	}
 
 	return Result;
+}
+
+// ---------------------------------------------------------------------------
+// FindWalkableIndex / FindEncounterSpawner — world-level actor discovery
+// ---------------------------------------------------------------------------
+
+AMelodiaPCGWalkableIndex* UMelodiaPCGLibrary::FindWalkableIndex(const UObject* WorldContextObject)
+{
+	if (!WorldContextObject)
+	{
+		return nullptr;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	for (TActorIterator<AMelodiaPCGWalkableIndex> It(World); It; ++It)
+	{
+		return *It;
+	}
+	return nullptr;
+}
+
+AMelodiaPCGEncounterSpawner* UMelodiaPCGLibrary::FindEncounterSpawner(const UObject* WorldContextObject)
+{
+	if (!WorldContextObject)
+	{
+		return nullptr;
+	}
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	for (TActorIterator<AMelodiaPCGEncounterSpawner> It(World); It; ++It)
+	{
+		return *It;
+	}
+	return nullptr;
 }

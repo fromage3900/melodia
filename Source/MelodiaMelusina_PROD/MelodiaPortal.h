@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "MelodiaInteractable.h"
 #include "MelodiaPortal.generated.h"
 
 class APawn;
@@ -11,7 +12,7 @@ class USphereComponent;
 class UStaticMeshComponent;
 
 UCLASS(Blueprintable)
-class MELODIAMELUSINA_PROD_API AMelodiaPortal : public AActor
+class MELODIAMELUSINA_PROD_API AMelodiaPortal : public AActor, public IMelodiaInteractable
 {
 	GENERATED_BODY()
 
@@ -50,6 +51,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Melodia|Portal")
 	bool IsPawnInRange(const APawn* Pawn) const;
+
+	// ── IMelodiaInteractable interface ──────────────────────────────
+	virtual FString GetDisplayName_Implementation() const override;
+	virtual FString GetInteractionPrompt_Implementation() const override;
+	virtual bool ActivateInteraction_Implementation(APawn* InstigatorPawn) override;
+	virtual bool CanInteract_Implementation(APawn* InstigatorPawn) const override;
+	virtual USphereComponent* GetInteractionSphere_Implementation() const override;
 
 protected:
 	virtual void BeginPlay() override;

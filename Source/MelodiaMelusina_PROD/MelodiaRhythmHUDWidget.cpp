@@ -24,6 +24,24 @@
 #include "Styling/CoreStyle.h"
 #include "Styling/SlateBrush.h"
 
+// ─────────────────────────────────────────────────────────────────────────────
+UMelodiaRhythmHUDWidget* UMelodiaRhythmHUDWidget::FindFirst(const UObject* WorldContextObject)
+{
+	if (!WorldContextObject)
+	{
+		return nullptr;
+	}
+
+	for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+	{
+		if (It->GetWorld() == WorldContextObject->GetWorld())
+		{
+			return *It;
+		}
+	}
+	return nullptr;
+}
+
 namespace
 {
 FSlateBrush MakeTintBrush(const FLinearColor& Tint)
@@ -892,7 +910,7 @@ void UMelodiaRhythmHUDWidget::SyncExplorationHUDFromWorld()
 	if (GameMode && GameMode->ActivePCGEncounterSpawner)
 	{
 		int32 GateIndex = 0;
-		for (const TObjectPtr<AActor>& SpawnedActor : GameMode->ActivePCGEncounterSpawner->SpawnedEncounters)
+		for (const TObjectPtr<AActor>& SpawnedActor : GameMode->ActivePCGEncounterSpawner->GetSpawnedActors())
 		{
 			if (!SpawnedActor)
 			{

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGMelodiaAttributes.h"
 #include "MelodiaQuestTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -51,6 +52,14 @@ struct MELODIAMELUSINA_PROD_API FMelodiaQuestDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Quest")
 	FVector WorldMarkerLocation = FVector::ZeroVector;
+
+	/**
+	 * Optional PCG architectural role for auto-generated markers.
+	 * When set, WorldMarkerLocation is ignored and the quest system
+	 * auto-discovers positions from PCG data matching this role.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Quest")
+	EPCGArchitecturalRole AssociatedPCGRole = EPCGArchitecturalRole::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Quest")
 	FString RewardText = TEXT("+50G");

@@ -39,6 +39,13 @@ class MELODIAMELUSINA_PROD_API UMelodiaRhythmHUDWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	/**
+	 * Find the first UMelodiaRhythmHUDWidget instance in the world.
+	 * Replaces the repeated TObjectIterator pattern scattered across 9+ files.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Melodia|HUD", meta = (WorldContext = "WorldContextObject"))
+	static UMelodiaRhythmHUDWidget* FindFirst(const UObject* WorldContextObject);
+
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 

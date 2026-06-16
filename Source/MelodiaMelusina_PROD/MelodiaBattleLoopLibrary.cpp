@@ -24,18 +24,9 @@ namespace
 {
 void ForEachRhythmHUD(UWorld* World, TFunctionRef<void(UMelodiaRhythmHUDWidget&)> Callback)
 {
-	if (!World)
+	if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 	{
-		return;
-	}
-
-	for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
-	{
-		UMelodiaRhythmHUDWidget* Widget = *It;
-		if (Widget && Widget->GetWorld() == World)
-		{
-			Callback(*Widget);
-		}
+		Callback(*Widget);
 	}
 }
 

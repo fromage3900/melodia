@@ -181,13 +181,9 @@ void AMelodiaRhythmGameModeBase::SetLoopPhase(const EMelodiaLoopPhase NewPhase)
 		++VictoryRewardPhaseCount;
 		if (UWorld* World = GetWorld())
 		{
-			for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+			if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 			{
-				UMelodiaRhythmHUDWidget* Widget = *It;
-				if (Widget && Widget->GetWorld() == World)
-				{
-					Widget->ShowActionPrompt(TEXT("Victory! Space/1 to claim reward"));
-				}
+				Widget->ShowActionPrompt(TEXT("Victory! Space/1 to claim reward"));
 			}
 		}
 		break;
@@ -486,13 +482,9 @@ void AMelodiaRhythmGameModeBase::RestoreExplorationControl()
 		if (bExplorationControlReady)
 		{
 			++ExplorationControlRestoreCount;
-			for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+			if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 			{
-				UMelodiaRhythmHUDWidget* Widget = *It;
-				if (Widget && Widget->GetWorld() == World)
-				{
-					Widget->ShowBattleStatus(TEXT("Explore: touch the song gate"));
-				}
+				Widget->ShowBattleStatus(TEXT("Explore: touch the song gate"));
 			}
 
 			UE_LOG(LogTemp, Log, TEXT("Melodia loop restored exploration control to %s."), *ExplorationPawn->GetName());
@@ -539,14 +531,10 @@ void AMelodiaRhythmGameModeBase::ApplyMelusinaPresentation(APawn* ExplorationPaw
 	EnsureRhythmHUDWidget();
 	if (UWorld* World = GetWorld())
 	{
-		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
-			UMelodiaRhythmHUDWidget* Widget = *It;
-			if (Widget && Widget->GetWorld() == World)
-			{
-				Widget->ApplyCuteCombatTheme();
-				Widget->TriggerSparkleBurst();
-			}
+			Widget->ApplyCuteCombatTheme();
+			Widget->TriggerSparkleBurst();
 		}
 	}
 }
@@ -567,17 +555,13 @@ void AMelodiaRhythmGameModeBase::EnsureRhythmHUDWidget()
 		return;
 	}
 
-	for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+	if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 	{
-		UMelodiaRhythmHUDWidget* Widget = *It;
-		if (Widget && Widget->GetWorld() == World)
-		{
-			ActiveRhythmHUDWidget = Widget;
-			ActiveRhythmHUDWidget->ApplyCuteCombatTheme();
-			ActiveRhythmHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-			bRhythmHUDWidgetInViewport = true;
-			return;
-		}
+		ActiveRhythmHUDWidget = Widget;
+		ActiveRhythmHUDWidget->ApplyCuteCombatTheme();
+		ActiveRhythmHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		bRhythmHUDWidgetInViewport = true;
+		return;
 	}
 
 	UClass* WidgetClass = ResolveClass(RhythmHUDWidgetClassPath);
@@ -616,9 +600,9 @@ void AMelodiaRhythmGameModeBase::EnsureEncounterTrigger()
 {
 	SyncExplorationLocations();
 
-	if (bPCGPlacementActive && ActivePCGEncounterSpawner && ActivePCGEncounterSpawner->SpawnedEncounters.Num() > 0)
+	if (bPCGPlacementActive && ActivePCGEncounterSpawner && ActivePCGEncounterSpawner->GetSpawnedActors().Num() > 0)
 	{
-		if (AMelodiaEncounterTrigger* PCGTrigger = Cast<AMelodiaEncounterTrigger>(ActivePCGEncounterSpawner->SpawnedEncounters[0]))
+		if (AMelodiaEncounterTrigger* PCGTrigger = Cast<AMelodiaEncounterTrigger>(ActivePCGEncounterSpawner->GetSpawnedActors()[0]))
 		{
 			ActiveEncounterTrigger = PCGTrigger;
 			EncounterTriggerLocation = PCGTrigger->GetActorLocation();
@@ -911,11 +895,7 @@ void AMelodiaRhythmGameModeBase::EnsurePCGGameplayPlacement()
 
 	if (!ActiveWalkableIndex)
 	{
-		for (TActorIterator<AMelodiaPCGWalkableIndex> It(World); It; ++It)
-		{
-			ActiveWalkableIndex = *It;
-			break;
-		}
+		ActiveWalkableIndex = UMelodiaPCGLibrary::FindWalkableIndex(World);
 	}
 
 	if (!ActiveWalkableIndex)
@@ -992,11 +972,7 @@ void AMelodiaRhythmGameModeBase::ApplyPCGPlacedInteractables()
 
 	if (!ActivePCGEncounterSpawner)
 	{
-		for (TActorIterator<AMelodiaPCGEncounterSpawner> It(World); It; ++It)
-		{
-			ActivePCGEncounterSpawner = *It;
-			break;
-		}
+		ActivePCGEncounterSpawner = UMelodiaPCGLibrary::FindEncounterSpawner(World);
 	}
 
 	if (!ActivePCGEncounterSpawner)
@@ -1012,7 +988,7 @@ void AMelodiaRhythmGameModeBase::ApplyPCGPlacedInteractables()
 		ActivePCGEncounterSpawner->WalkableIndex = ActiveWalkableIndex;
 		ActivePCGEncounterSpawner->SearchRadiusCm = PCGPlacementSearchRadius;
 		ActivePCGEncounterSpawner->SetActorLocation(PCGCenter);
-		ActivePCGEncounterSpawner->ClearSpawnedEncounters();
+		ActivePCGEncounterSpawner->ClearSpawnedActors();
 		PCGSpawnedEncounterCount = ActivePCGEncounterSpawner->ScanAndSpawn();
 	}
 

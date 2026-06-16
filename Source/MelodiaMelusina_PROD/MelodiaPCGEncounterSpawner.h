@@ -5,66 +5,26 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
-#include "PCGMelodiaAttributes.h"
+#include "MelodiaPCGSpawnerBase.h"
 #include "MelodiaPCGEncounterSpawner.generated.h"
-
-class UPCGComponent;
-class AMelodiaPCGWalkableIndex;
 
 /**
  * Scans PCG-generated points for ArchitecturalRole attributes and spawns
  * AMelodiaEncounterTrigger actors at matching locations.  Designed to be
  * driven by AMelodiaReverieRunManager during procedural area generation.
+ *
+ * Inherits common spawner logic from AMelodiaPCGSpawnerBase; only implements
+ * the encounter-specific SpawnActorAt() hook.
  */
 UCLASS(Blueprintable)
-class MELODIAMELUSINA_PROD_API AMelodiaPCGEncounterSpawner : public AActor
+class MELODIAMELUSINA_PROD_API AMelodiaPCGEncounterSpawner : public AMelodiaPCGSpawnerBase
 {
 	GENERATED_BODY()
 
 public:
 	AMelodiaPCGEncounterSpawner();
 
-	/** Which architectural roles are valid encounter spawn sites. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Encounter")
-	TArray<EPCGArchitecturalRole> AcceptedRoles;
-
-	/** Maximum encounters to spawn per scan. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Encounter", meta = (ClampMin = "1", ClampMax = "16"))
-	int32 MaxEncounters = 3;
-
-	/** Minimum distance (cm) between spawned encounters. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Encounter", meta = (ClampMin = "100"))
-	float MinSpacingCm = 800.0f;
-
-	/** Radius (cm) to search for PCG components. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Encounter", meta = (ClampMin = "500"))
-	float SearchRadiusCm = 5000.0f;
-
-	/** If true, use the walkable index for fast PCG attribute queries (preferred). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Encounter")
-	bool bUseWalkableIndex = true;
-
-	/** Optional reference to a walkable index actor. Auto-discovered if null. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Encounter")
-	TObjectPtr<AMelodiaPCGWalkableIndex> WalkableIndex;
-
-	/** Triggers spawned by the last ScanAndSpawn call. */
-	UPROPERTY(BlueprintReadOnly, Category = "Melodia|PCG Encounter")
-	TArray<TObjectPtr<AActor>> SpawnedEncounters;
-
-	/** Scan nearby PCG data and spawn encounter triggers at matching roles. */
-	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG Encounter")
-	int32 ScanAndSpawn();
-
-	/** Remove all previously spawned encounters. */
-	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG Encounter")
-	void ClearSpawnedEncounters();
-
 protected:
-	virtual void BeginPlay() override;
-
-private:
-	/** Collect candidate positions from PCG components near this actor. */
-	TArray<FVector> CollectRolePositions() const;
+	/** Create one AMelodiaEncounterTrigger at the given position. */
+	virtual bool SpawnActorAt(const FVector& Position, EPCGArchitecturalRole ArchRole, AActor*& OutActor) override;
 };

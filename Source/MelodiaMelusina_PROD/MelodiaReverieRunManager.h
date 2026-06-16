@@ -20,6 +20,7 @@
 class UPCGComponent;
 class UPCGGraph;
 class AMelodiaPCGEncounterSpawner;
+class AMelodiaPCGDecorationSpawner;
 
 /** Current state of the procedural run. */
 UENUM(BlueprintType)
@@ -115,6 +116,14 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Reverie|Encounters")
 	TObjectPtr<AMelodiaPCGEncounterSpawner> ActiveEncounterSpawner;
 
+	/** Optional class for the decoration spawner (visual dressing). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reverie|Decoration")
+	TSubclassOf<AMelodiaPCGDecorationSpawner> DecorationSpawnerClass;
+
+	/** Active decoration spawner (created during area generation). */
+	UPROPERTY(BlueprintReadOnly, Category = "Reverie|Decoration")
+	TObjectPtr<AMelodiaPCGDecorationSpawner> ActiveDecorationSpawner;
+
 	// --- Blueprint-callable API ---
 
 	/** Start a new procedural run.  Generates the area sequence and begins generation. */
@@ -158,6 +167,12 @@ protected:
 
 	/** Spawn encounter triggers for the current area using the encounter spawner. */
 	void SpawnEncountersForCurrentArea();
+
+	/** Spawn decoration meshes for the current area using the decoration spawner. */
+	void SpawnDecorationsForCurrentArea();
+
+	/** Clean up all run-level actors (spawners). Called when run ends or aborts. */
+	void CleanupRunActors();
 
 private:
 	/** FStreamableHandle for async-loaded PCG graph assets. */

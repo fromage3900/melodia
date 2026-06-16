@@ -6,6 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "MelodiaInventoryComponent.h"
 #include "MelodiaRhythmHUDWidget.h"
+#include "PCG/MelodiaPCGLibrary.h"
 #include "UObject/UObjectIterator.h"
 
 AMelodiaQuestManagerBase::AMelodiaQuestManagerBase()
@@ -189,21 +190,19 @@ void AMelodiaQuestManagerBase::SyncHUD(UWorld* World) const
 		}
 	}
 
-	for (TObjectIterator<UMelodiaRhythmHUDWidget> WidgetIt; WidgetIt; ++WidgetIt)
+	if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 	{
-		UMelodiaRhythmHUDWidget* Widget = *WidgetIt;
-		if (Widget && Widget->GetWorld() == World)
-		{
-			Widget->SetQuestLogEntries(QuestLines, LastQuestToast);
-			Widget->SetInventorySlots(InventorySlots);
-			Widget->SetMinimapMarkers(BuildQuestMarkers());
-		}
+		Widget->SetQuestLogEntries(QuestLines, LastQuestToast);
+		Widget->SetInventorySlots(InventorySlots);
+		Widget->SetMinimapMarkers(BuildQuestMarkers());
 	}
 }
 
 TArray<FMelodiaMinimapMarker> AMelodiaQuestManagerBase::BuildQuestMarkers() const
 {
 	TArray<FMelodiaMinimapMarker> Markers;
+	UWorld* World = GetWorld();
+
 	for (const FMelodiaQuestProgress& Progress : QuestProgress)
 	{
 		if (Progress.Status != EMelodiaQuestStatus::Active)
@@ -212,7 +211,37 @@ TArray<FMelodiaMinimapMarker> AMelodiaQuestManagerBase::BuildQuestMarkers() cons
 		}
 
 		const FMelodiaQuestDefinition* Definition = FindDefinition(Progress.QuestId);
-		if (!Definition || Definition->WorldMarkerLocation.IsNearlyZero(10.0f))
+		if (!Definition)
+		{
+			continue;
+		}
+
+		// PCG-driven marker: auto-discover positions from PCG data.
+		if (Definition->AssociatedPCGRole != EPCGArchitecturalRole::None && World)
+		{
+			const FVector SearchCenter = Definition->WorldMarkerLocation.IsNearlyZero(10.0f)
+				? FVector::ZeroVector
+				: Definition->WorldMarkerLocation;
+			constexpr float SearchRadius = 50000.0f; // Large radius to cover the level.
+
+			const TArray<FMelodiaWalkablePoint> PCGPoints =
+				UMelodiaPCGLibrary::GetWalkablePointsByRoleInRadius(
+					World, SearchCenter, SearchRadius, Definition->AssociatedPCGRole);
+
+			for (const FMelodiaWalkablePoint& Pt : PCGPoints)
+			{
+				FMelodiaMinimapMarker Marker;
+				Marker.WorldLocation = Pt.Location;
+				Marker.Label = Definition->Title;
+				Marker.Tint = FLinearColor(0.98f, 0.78f, 0.32f, 1.0f);
+				Marker.bPulse = Definition->ObjectiveType == EMelodiaQuestObjectiveType::ReachLocation;
+				Markers.Add(Marker);
+			}
+			continue;
+		}
+
+		// Static marker: use the manually-set WorldMarkerLocation.
+		if (Definition->WorldMarkerLocation.IsNearlyZero(10.0f))
 		{
 			continue;
 		}
@@ -225,6 +254,15 @@ TArray<FMelodiaMinimapMarker> AMelodiaQuestManagerBase::BuildQuestMarkers() cons
 		Markers.Add(Marker);
 	}
 	return Markers;
+}
+
+void AMelodiaQuestManagerBase::NotifyPCGRebuilt()
+{
+	// Refresh HUD markers to reflect new PCG-derived quest positions.
+	if (UWorld* World = GetWorld())
+	{
+		SyncHUD(World);
+	}
 }
 
 void AMelodiaQuestManagerBase::AddQuestDefinition(const FMelodiaQuestDefinition& Definition)
@@ -388,14 +426,10 @@ void AMelodiaQuestManagerBase::PushQuestToast(const FString& ToastText) const
 {
 	if (UWorld* World = GetWorld())
 	{
-		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
-			UMelodiaRhythmHUDWidget* Widget = *It;
-			if (Widget && Widget->GetWorld() == World)
-			{
-				Widget->SetJudgmentString(ToastText);
-				Widget->TriggerSparkleBurst();
-			}
+			Widget->SetJudgmentString(ToastText);
+			Widget->TriggerSparkleBurst();
 		}
 	}
 }

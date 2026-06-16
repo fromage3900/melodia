@@ -128,18 +128,14 @@ bool UMelodiaRhythmExecutionComponent::TryHitCurrentNote()
 
 	if (UWorld* World = GetWorld())
 	{
-		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
-			UMelodiaRhythmHUDWidget* Widget = *It;
-			if (Widget && Widget->GetWorld() == World)
+			Widget->SetJudgment(GradeResult.DisplayText);
+			Widget->DoPulse();
+			Widget->PushFloatingCombatText(GradeResult.DisplayText.ToString(), true, GradeTint(GradeResult.Grade, FLinearColor(0.86f, 0.72f, 1.0f, 1.0f)));
+			if (GradeResult.bCountsAsHit)
 			{
-				Widget->SetJudgment(GradeResult.DisplayText);
-				Widget->DoPulse();
-				Widget->PushFloatingCombatText(GradeResult.DisplayText.ToString(), true, GradeTint(GradeResult.Grade, FLinearColor(0.86f, 0.72f, 1.0f, 1.0f)));
-				if (GradeResult.bCountsAsHit)
-				{
-					Widget->TriggerSparkleBurst();
-				}
+				Widget->TriggerSparkleBurst();
 			}
 		}
 	}
@@ -175,13 +171,9 @@ void UMelodiaRhythmExecutionComponent::CancelExecution()
 
 	if (UWorld* World = GetWorld())
 	{
-		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
-			UMelodiaRhythmHUDWidget* Widget = *It;
-			if (Widget && Widget->GetWorld() == World)
-			{
-				Widget->SetNoteHighwayActive(false, TArray<FMelodiaHighwayNote>(), 0.0f, ScrollBeatsAhead);
-			}
+			Widget->SetNoteHighwayActive(false, TArray<FMelodiaHighwayNote>(), 0.0f, ScrollBeatsAhead);
 		}
 	}
 }
@@ -215,13 +207,9 @@ void UMelodiaRhythmExecutionComponent::BuildNotesFromSong(const TArray<int32>& N
 
 	if (UWorld* World = GetWorld())
 	{
-		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
-			UMelodiaRhythmHUDWidget* Widget = *It;
-			if (Widget && Widget->GetWorld() == World)
-			{
-				Widget->ShowActionPrompt(bSkill ? TEXT("Tap on beat | 2=Skill | Space/1=Hit") : TEXT("Tap on beat | Space/1=Hit"));
-			}
+			Widget->ShowActionPrompt(bSkill ? TEXT("Tap on beat | 2=Skill | Space/1=Hit") : TEXT("Tap on beat | Space/1=Hit"));
 		}
 	}
 }
@@ -239,17 +227,13 @@ void UMelodiaRhythmExecutionComponent::SyncHighwayHUD()
 	if (UWorld* World = GetWorld())
 	{
 		const float BeatPosition = GetCurrentBeatPosition();
-		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
-			UMelodiaRhythmHUDWidget* Widget = *It;
-			if (Widget && Widget->GetWorld() == World)
-			{
-				Widget->SetNoteHighwayActive(
-					ExecutionState == EMelodiaRhythmExecutionState::Active,
-					ActiveNotes,
-					BeatPosition,
-					ScrollBeatsAhead);
-			}
+			Widget->SetNoteHighwayActive(
+				ExecutionState == EMelodiaRhythmExecutionState::Active,
+				ActiveNotes,
+				BeatPosition,
+				ScrollBeatsAhead);
 		}
 	}
 }
@@ -287,14 +271,10 @@ void UMelodiaRhythmExecutionComponent::ResolveMissedNotes()
 
 		if (UWorld* World = GetWorld())
 		{
-			for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+			if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 			{
-				UMelodiaRhythmHUDWidget* Widget = *It;
-				if (Widget && Widget->GetWorld() == World)
-				{
-					Widget->SetJudgmentString(TEXT("Miss"));
-					Widget->PushFloatingCombatText(TEXT("MISS"), true, FLinearColor(0.96f, 0.28f, 0.42f, 1.0f));
-				}
+				Widget->SetJudgmentString(TEXT("Miss"));
+				Widget->PushFloatingCombatText(TEXT("MISS"), true, FLinearColor(0.96f, 0.28f, 0.42f, 1.0f));
 			}
 		}
 	}

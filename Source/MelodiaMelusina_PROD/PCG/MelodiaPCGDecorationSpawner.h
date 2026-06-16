@@ -6,11 +6,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
-#include "PCGMelodiaAttributes.h"
+#include "MelodiaPCGSpawnerBase.h"
 #include "MelodiaPCGDecorationSpawner.generated.h"
-
-class AMelodiaPCGWalkableIndex;
 
 /** Maps an architectural role to a decorative mesh and optional scale range. */
 USTRUCT(BlueprintType)
@@ -38,59 +35,23 @@ struct FMelodiaDecorationMapping
  *
  * Supported decorative roles: Railing, Ornament, Column, Cornice, Roof.
  * Configure RoleToMesh to map each role to a mesh + scale.
+ *
+ * Inherits common spawner logic from AMelodiaPCGSpawnerBase; only implements
+ * the decoration-specific SpawnActorAt() hook.
  */
 UCLASS(Blueprintable)
-class MELODIAMELUSINA_PROD_API AMelodiaPCGDecorationSpawner : public AActor
+class MELODIAMELUSINA_PROD_API AMelodiaPCGDecorationSpawner : public AMelodiaPCGSpawnerBase
 {
 	GENERATED_BODY()
 
 public:
 	AMelodiaPCGDecorationSpawner();
 
-	/** Which architectural roles receive decoration meshes. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Decoration")
-	TArray<EPCGArchitecturalRole> AcceptedRoles;
-
 	/** Per-role mesh mapping.  Roles not present here are skipped. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Decoration")
 	TMap<EPCGArchitecturalRole, FMelodiaDecorationMapping> RoleToMesh;
 
-	/** Maximum decorations to spawn per scan. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Decoration", meta = (ClampMin = "1", ClampMax = "256"))
-	int32 MaxDecorations = 32;
-
-	/** Minimum distance (cm) between spawned decorations. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Decoration", meta = (ClampMin = "50"))
-	float MinSpacingCm = 300.0f;
-
-	/** Radius (cm) to search for PCG walkable points. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Decoration", meta = (ClampMin = "500"))
-	float SearchRadiusCm = 5000.0f;
-
-	/** If true, use the walkable index for fast PCG attribute queries (preferred). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Decoration")
-	bool bUseWalkableIndex = true;
-
-	/** Optional reference to a walkable index actor. Auto-discovered if null. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Decoration")
-	TObjectPtr<AMelodiaPCGWalkableIndex> WalkableIndex;
-
-	/** Decoration actors spawned by the last ScanAndSpawn call. */
-	UPROPERTY(BlueprintReadOnly, Category = "Melodia|PCG Decoration")
-	TArray<TObjectPtr<AActor>> SpawnedDecorations;
-
-	/** Scan nearby PCG data and spawn decoration meshes at matching roles. */
-	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG Decoration")
-	int32 ScanAndSpawn();
-
-	/** Remove all previously spawned decoration actors. */
-	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG Decoration")
-	void ClearSpawnedDecorations();
-
 protected:
-	virtual void BeginPlay() override;
-
-private:
-	/** Collect candidate positions + roles from PCG data near this actor. */
-	TArray<TPair<FVector, EPCGArchitecturalRole>> CollectRolePositions() const;
+	/** Create one decoration actor at the given position with normal-based orientation. */
+	virtual bool SpawnActorAt(const FVector& Position, EPCGArchitecturalRole ArchRole, AActor*& OutActor) override;
 };

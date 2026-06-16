@@ -10,6 +10,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "MelodiaBattleLoopLibrary.h"
+#include "MelodiaPCGLibrary.h"
 #include "MelodiaQuestManagerBase.h"
 #include "MelodiaRhythmGameModeBase.h"
 #include "MelodiaRhythmHUDWidget.h"
@@ -123,13 +124,9 @@ bool AMelodiaEncounterTrigger::StartEncounter(AActor* InstigatorActor)
 
 	if (UWorld* World = GetWorld())
 	{
-		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
-			UMelodiaRhythmHUDWidget* Widget = *It;
-			if (Widget && Widget->GetWorld() == World)
-			{
-				Widget->ShowBattleStatus(TEXT("Battle started"));
-			}
+			Widget->ShowBattleStatus(TEXT("Battle started"));
 		}
 	}
 
@@ -412,12 +409,7 @@ FVector AMelodiaEncounterTrigger::FindPCGWalkablePosition(const FVector& Desired
 	}
 
 	// Preferred path: use the WalkableIndex for actual walkable point data.
-	AMelodiaPCGWalkableIndex* Index = nullptr;
-	for (TActorIterator<AMelodiaPCGWalkableIndex> It(World); It; ++It)
-	{
-		Index = *It;
-		break;
-	}
+	AMelodiaPCGWalkableIndex* Index = UMelodiaPCGLibrary::FindWalkableIndex(World);
 
 	if (Index && Index->GetCachedPointCount() > 0)
 	{

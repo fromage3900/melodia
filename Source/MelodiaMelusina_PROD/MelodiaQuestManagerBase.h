@@ -69,6 +69,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Melodia|Quest")
 	TArray<FMelodiaMinimapMarker> BuildQuestMarkers() const;
 
+	/**
+	 * Rebuild quest markers using PCG data. Called when PCG is regenerated.
+	 * Quests with AssociatedPCGRole set will auto-discover positions.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
+	void NotifyPCGRebuilt();
+
 protected:
 	void AddQuestDefinition(const FMelodiaQuestDefinition& Definition);
 	FMelodiaQuestProgress* FindProgress(FName QuestId);

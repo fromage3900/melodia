@@ -1,4 +1,18 @@
 // Runtime bootstrapper for the Melodia rhythm vertical slice.
+//
+// OWNERSHIP MODEL:
+// ─────────────────────────────────────────────────────────────────────────────
+// Platform-level (owned by GameModeBase, persist across runs):
+//   - HUD widget, MusicManager, ExplorationPawn, BattleInput bridge
+//
+// Run-level (owned by AMelodiaReverieRunManager when present):
+//   - WalkableIndex, EncounterSpawner, DecorationSpawner
+//   - PCG graph generation, area transitions
+//
+// The ActiveWalkableIndex / ActivePCGEncounterSpawner references below are
+// CACHED OBSERVER references. GameModeBase discovers them for convenience
+// but does NOT own their lifecycle when a ReverieRunManager is active.
+// ─────────────────────────────────────────────────────────────────────────────
 
 #pragma once
 
@@ -92,9 +106,23 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|PCG", meta=(ClampMin="500"))
 	float PCGPlacementSearchRadius = 15000.0f;
 
+	/**
+	 * Cached reference to the active walkable index.
+	 * 
+	 * OWNERSHIP: When AMelodiaReverieRunManager is present, it owns the
+	 * WalkableIndex lifecycle. This reference is cached for convenient
+	 * queries; do not spawn/destroy directly when a run manager exists.
+	 */
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|PCG")
 	TObjectPtr<AMelodiaPCGWalkableIndex> ActiveWalkableIndex;
 
+	/**
+	 * Cached reference to the active encounter spawner.
+	 * 
+	 * OWNERSHIP: When AMelodiaReverieRunManager is present, it owns the
+	 * EncounterSpawner lifecycle. This reference is cached for convenient
+	 * queries; do not spawn/destroy directly when a run manager exists.
+	 */
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|PCG")
 	TObjectPtr<AMelodiaPCGEncounterSpawner> ActivePCGEncounterSpawner;
 

@@ -88,14 +88,39 @@ void AMelodiaPortal::PublishPortalFeedback(UWorld* World, const FString& Text) c
 		return;
 	}
 
-	for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+	if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 	{
-		UMelodiaRhythmHUDWidget* Widget = *It;
-		if (Widget && Widget->GetWorld() == World)
-		{
-			Widget->ShowBattleStatus(Text);
-			Widget->ShowActionPrompt(Text);
-			Widget->PushFloatingCombatText(TEXT("PORTAL"), false, FLinearColor(0.86f, 0.62f, 1.0f, 1.0f));
-		}
+		Widget->ShowBattleStatus(Text);
+		Widget->ShowActionPrompt(Text);
+		Widget->PushFloatingCombatText(TEXT("PORTAL"), false, FLinearColor(0.86f, 0.62f, 1.0f, 1.0f));
 	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMelodiaInteractable interface implementation
+// ─────────────────────────────────────────────────────────────────────────────
+
+FString AMelodiaPortal::GetDisplayName_Implementation() const
+{
+	return DisplayName;
+}
+
+FString AMelodiaPortal::GetInteractionPrompt_Implementation() const
+{
+	return InteractionPrompt;
+}
+
+bool AMelodiaPortal::ActivateInteraction_Implementation(APawn* InstigatorPawn)
+{
+	return ActivatePortal(InstigatorPawn);
+}
+
+bool AMelodiaPortal::CanInteract_Implementation(APawn* InstigatorPawn) const
+{
+	return IsPawnInRange(InstigatorPawn);
+}
+
+USphereComponent* AMelodiaPortal::GetInteractionSphere_Implementation() const
+{
+	return InteractionSphere;
 }

@@ -6,9 +6,8 @@
 #include "GameFramework/PlayerController.h"
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
-#include "MelodiaPortal.h"
+#include "MelodiaInteractable.h"
 #include "MelodiaQuestManagerBase.h"
-#include "MelodiaRestPoint.h"
 #include "MelodiaRhythmHUDWidget.h"
 #include "UObject/UObjectIterator.h"
 
@@ -50,13 +49,9 @@ void UMelodiaExplorationInputComponent::ToggleInventoryPanel()
 {
 	if (UWorld* World = GetWorld())
 	{
-		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
-			UMelodiaRhythmHUDWidget* Widget = *It;
-			if (Widget && Widget->GetWorld() == World)
-			{
-				Widget->SetInventoryPanelOpen(!Widget->bInventoryPanelOpen);
-			}
+			Widget->SetInventoryPanelOpen(!Widget->bInventoryPanelOpen);
 		}
 
 		for (TActorIterator<AMelodiaQuestManagerBase> QuestIt(World); QuestIt; ++QuestIt)
@@ -81,53 +76,39 @@ bool UMelodiaExplorationInputComponent::ActivateNearestInteraction()
 		return false;
 	}
 
+	// Find the nearest actor implementing IMelodiaInteractable.
 	AActor* BestActor = nullptr;
 	float BestDistanceSq = TNumericLimits<float>::Max();
 
-	for (TActorIterator<AMelodiaRestPoint> It(World); It; ++It)
+	for (TActorIterator<AActor> It(World); It; ++It)
 	{
-		AMelodiaRestPoint* RestPoint = *It;
-		if (RestPoint && RestPoint->IsPawnInRange(PlayerPawn))
+		AActor* Candidate = *It;
+		if (!Candidate || !Candidate->GetClass()->ImplementsInterface(UMelodiaInteractable::StaticClass()))
 		{
-			const float DistSq = FVector::DistSquared(PlayerPawn->GetActorLocation(), RestPoint->GetActorLocation());
-			if (DistSq < BestDistanceSq)
-			{
-				BestDistanceSq = DistSq;
-				BestActor = RestPoint;
-			}
+			continue;
+		}
+
+		if (!IMelodiaInteractable::Execute_CanInteract(Candidate, PlayerPawn))
+		{
+			continue;
+		}
+
+		const float DistSq = FVector::DistSquared(PlayerPawn->GetActorLocation(), Candidate->GetActorLocation());
+		if (DistSq < BestDistanceSq)
+		{
+			BestDistanceSq = DistSq;
+			BestActor = Candidate;
 		}
 	}
 
-	for (TActorIterator<AMelodiaPortal> It(World); It; ++It)
+	if (BestActor)
 	{
-		AMelodiaPortal* Portal = *It;
-		if (Portal && Portal->IsPawnInRange(PlayerPawn))
-		{
-			const float DistSq = FVector::DistSquared(PlayerPawn->GetActorLocation(), Portal->GetActorLocation());
-			if (DistSq < BestDistanceSq)
-			{
-				BestDistanceSq = DistSq;
-				BestActor = Portal;
-			}
-		}
+		return IMelodiaInteractable::Execute_ActivateInteraction(BestActor, PlayerPawn);
 	}
 
-	if (AMelodiaRestPoint* RestPoint = Cast<AMelodiaRestPoint>(BestActor))
+	if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 	{
-		return RestPoint->ActivateRest(PlayerPawn);
-	}
-	if (AMelodiaPortal* Portal = Cast<AMelodiaPortal>(BestActor))
-	{
-		return Portal->ActivatePortal(PlayerPawn);
-	}
-
-	for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
-	{
-		UMelodiaRhythmHUDWidget* Widget = *It;
-		if (Widget && Widget->GetWorld() == World)
-		{
-			Widget->ShowActionPrompt(TEXT("No interaction nearby"));
-		}
+		Widget->ShowActionPrompt(TEXT("No interaction nearby"));
 	}
 	return false;
 }

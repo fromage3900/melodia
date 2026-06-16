@@ -15,6 +15,8 @@
 class UPCGComponent;
 class UPCGPointData;
 class UPCGMetadata;
+class AMelodiaPCGWalkableIndex;
+class AMelodiaPCGEncounterSpawner;
 
 /** A single walkable point extracted from PCG output data. */
 USTRUCT(BlueprintType)
@@ -114,6 +116,16 @@ public:
 		const FVector& Center,
 		float Radius,
 		EPCGArchitecturalRole Role);
+
+	/** Find the first AMelodiaPCGWalkableIndex actor in the world. */
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG",
+		meta = (WorldContext = "WorldContextObject"))
+	static AMelodiaPCGWalkableIndex* FindWalkableIndex(const UObject* WorldContextObject);
+
+	/** Find the first AMelodiaPCGEncounterSpawner actor in the world. */
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG",
+		meta = (WorldContext = "WorldContextObject"))
+	static AMelodiaPCGEncounterSpawner* FindEncounterSpawner(const UObject* WorldContextObject);
 
 	// -----------------------------------------------------------------
 	// Internal helpers (C++ only — not exposed to Blueprint)
