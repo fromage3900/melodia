@@ -5,7 +5,10 @@
 #include "Components/InputComponent.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/PlayerController.h"
+#include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
+#include "MelodiaRhythmExecutionComponent.h"
+#include "MelodiaRhythmGameModeBase.h"
 
 UMelodiaBattleInputComponent::UMelodiaBattleInputComponent()
 {
@@ -16,6 +19,8 @@ void UMelodiaBattleInputComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	EnsureExecutionComponent();
+
 	if (bAutoBindPlayerInput)
 	{
 		BindBattleInput();
@@ -24,9 +29,8 @@ void UMelodiaBattleInputComponent::BeginPlay()
 
 bool UMelodiaBattleInputComponent::BindBattleInput()
 {
-	AActor* Owner = GetOwner();
 	UWorld* World = GetWorld();
-	if (!Owner || !World)
+	if (!World)
 	{
 		return false;
 	}
@@ -34,40 +38,166 @@ bool UMelodiaBattleInputComponent::BindBattleInput()
 	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(World, 0);
 	if (!PlayerController)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Melodia battle input: no player controller yet."));
 		return false;
 	}
 
-	Owner->EnableInput(PlayerController);
-	if (!Owner->InputComponent)
+	UInputComponent* InputComponent = PlayerController->InputComponent;
+	if (!InputComponent)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Melodia battle input: player controller has no InputComponent."));
+		return false;
+	}
+
+	if (bInputBound)
+	{
+		return true;
+	}
+
+	// Legacy action names (DefaultInput.ini) plus direct key binds for Enhanced Input projects.
+	InputComponent->BindAction(TEXT("Attack"), IE_Pressed, this, &UMelodiaBattleInputComponent::OnBasicInputPressed);
+	InputComponent->BindAction(TEXT("Skill"), IE_Pressed, this, &UMelodiaBattleInputComponent::OnSkillInputPressed);
+	InputComponent->BindAction(TEXT("Ultimate"), IE_Pressed, this, &UMelodiaBattleInputComponent::OnUltimateInputPressed);
+	InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &UMelodiaBattleInputComponent::OnBasicInputPressed);
+	InputComponent->BindKey(EKeys::One, IE_Pressed, this, &UMelodiaBattleInputComponent::OnBasicInputPressed);
+	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &UMelodiaBattleInputComponent::OnSkillInputPressed);
+	InputComponent->BindKey(EKeys::R, IE_Pressed, this, &UMelodiaBattleInputComponent::OnUltimateInputPressed);
+	InputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &UMelodiaBattleInputComponent::OnBasicInputPressed);
+	InputComponent->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Pressed, this, &UMelodiaBattleInputComponent::OnSkillInputPressed);
+	InputComponent->BindKey(EKeys::Gamepad_RightTrigger, IE_Pressed, this, &UMelodiaBattleInputComponent::OnUltimateInputPressed);
+	bInputBound = true;
+
+	UE_LOG(LogTemp, Log, TEXT("Melodia battle input bound Attack/Skill/Ultimate on player controller."));
+	return true;
+}
+
+UMelodiaRhythmExecutionComponent* UMelodiaBattleInputComponent::EnsureExecutionComponent()
+{
+	AActor* Owner = GetOwner();
+	if (!Owner)
+	{
+		return nullptr;
+	}
+
+	if (UMelodiaRhythmExecutionComponent* Existing = Owner->FindComponentByClass<UMelodiaRhythmExecutionComponent>())
+	{
+		return Existing;
+	}
+
+	UMelodiaRhythmExecutionComponent* NewComponent = NewObject<UMelodiaRhythmExecutionComponent>(Owner, UMelodiaRhythmExecutionComponent::StaticClass(), TEXT("MelodiaRhythmExecution"));
+	if (NewComponent)
+	{
+		NewComponent->RegisterComponent();
+		Owner->AddInstanceComponent(NewComponent);
+	}
+	return NewComponent;
+}
+
+bool UMelodiaBattleInputComponent::IsBattleInputAllowed() const
+{
+	if (const UWorld* World = GetWorld())
+	{
+		if (const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(World)))
+		{
+			return GameMode->CurrentLoopPhase == EMelodiaLoopPhase::Battle
+				|| GameMode->CurrentLoopPhase == EMelodiaLoopPhase::VictoryReward;
+		}
+	}
+
+	return false;
+}
+
+bool UMelodiaBattleInputComponent::TryConfirmVictoryReward()
+{
+	AActor* BattleController = GetOwner();
+	if (!BattleController || !UMelodiaBattleLoopLibrary::HasRhythmVictoryResolved(BattleController))
 	{
 		return false;
 	}
 
-	Owner->InputComponent->BindAction(TEXT("Attack"), IE_Pressed, this, &UMelodiaBattleInputComponent::OnBasicInputPressed);
-	Owner->InputComponent->BindAction(TEXT("Skill"), IE_Pressed, this, &UMelodiaBattleInputComponent::OnSkillInputPressed);
-	Owner->InputComponent->BindAction(TEXT("Ultimate"), IE_Pressed, this, &UMelodiaBattleInputComponent::OnUltimateInputPressed);
-	bInputBound = true;
+	UMelodiaBattleLoopLibrary::ConfirmRhythmVictoryReward(BattleController);
 	return true;
 }
 
 bool UMelodiaBattleInputComponent::HandleBasicInput()
 {
+	if (!IsBattleInputAllowed())
+	{
+		return false;
+	}
+
+	if (TryConfirmVictoryReward())
+	{
+		return true;
+	}
+
 	++BasicInputCount;
 	LastInputCommandName = TEXT("Basic");
+
+	UMelodiaRhythmExecutionComponent* Execution = EnsureExecutionComponent();
+	if (Execution && Execution->IsExecutionActive())
+	{
+		return Execution->TryHitCurrentNote();
+	}
+
+	if (Execution && Execution->BeginBasicExecution())
+	{
+		return true;
+	}
+
 	return ExecuteInputCommand(EMelodiaRhythmBattleCommand::Basic);
 }
 
 bool UMelodiaBattleInputComponent::HandleSkillInput()
 {
+	if (!IsBattleInputAllowed())
+	{
+		return false;
+	}
+
+	if (TryConfirmVictoryReward())
+	{
+		return true;
+	}
+
 	++SkillInputCount;
 	LastInputCommandName = TEXT("Skill");
-	return ExecuteInputCommand(EMelodiaRhythmBattleCommand::Skill);
+
+	UMelodiaRhythmExecutionComponent* Execution = EnsureExecutionComponent();
+	if (Execution && Execution->IsExecutionActive())
+	{
+		return Execution->TryHitCurrentNote();
+	}
+
+	if (Execution && Execution->BeginSkillExecution())
+	{
+		return true;
+	}
+
+	return false;
 }
 
 bool UMelodiaBattleInputComponent::HandleUltimateInput()
 {
+	if (!IsBattleInputAllowed())
+	{
+		return false;
+	}
+
+	if (TryConfirmVictoryReward())
+	{
+		return true;
+	}
+
 	++UltimateInputCount;
 	LastInputCommandName = TEXT("Ultimate");
+
+	UMelodiaRhythmExecutionComponent* Execution = EnsureExecutionComponent();
+	if (Execution && Execution->IsExecutionActive())
+	{
+		Execution->CancelExecution();
+	}
+
 	return ExecuteInputCommand(EMelodiaRhythmBattleCommand::Ultimate);
 }
 

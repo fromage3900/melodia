@@ -37,9 +37,10 @@
 //   NewObject<> whose lifetime is managed by the PCG framework's context.
 
 #include "PCGRecursiveArchSettings.h"
+#include "PCGMelodiaAttributes.h"
 
 #ifndef MELODIA_ENABLE_EXPERIMENTAL_PCG
-#define MELODIA_ENABLE_EXPERIMENTAL_PCG 0
+#define MELODIA_ENABLE_EXPERIMENTAL_PCG 1
 #endif
 
 #if MELODIA_ENABLE_EXPERIMENTAL_PCG
@@ -115,29 +116,17 @@ bool FPCGRecursiveArchElement::ExecuteInternal(FPCGContext* Context) const
 
     if (ScaleFactor < 0.3f)
     {
-        // Blueprint-visible warning via LogAndNotifyUser (Requirement 4.6).
-        // This surfaces in the PCG component's notification panel at editor time
-        // so artists see it without opening the output log.
-        Context->LogAndNotifyUser(
-            FText::Format(
-                NSLOCTEXT("PCGRecursiveArch", "ScaleFactorClamped",
-                    "PCGRecursiveArchElement: ScaleFactor {0} is below the minimum 0.3 "
-                    "and has been clamped. Reduce recursion depth to achieve smaller "
-                    "arch scales."),
-                FText::AsNumber(Settings->ScaleFactor)));
+        // UE 5.7 removed FPCGContext::LogAndNotifyUser; log to the PCG channel instead.
+        UE_LOG(LogPCG, Warning,
+               TEXT("PCGRecursiveArchElement: ScaleFactor %f is below the minimum 0.3 "
+                    "and has been clamped. Reduce recursion depth to achieve smaller arch scales."),
+               Settings->ScaleFactor);
 
         ScaleFactor = 0.3f;
     }
 
     const float ArchWidth  = Settings->ArchWidth;
     const float ArchHeight = Settings->ArchHeight;
-
-    // -----------------------------------------------------------------------
-    // 3. The attribute name shared across all tiers (design §5.1).
-    //    Declared here so it is constructed once per Execute() call rather
-    //    than inside the inner loop.
-    // -----------------------------------------------------------------------
-    static const FName RecursionTierAttributeName(TEXT("RecursionTier"));
 
     // -----------------------------------------------------------------------
     // 4. Per-tier generation loop
@@ -194,32 +183,65 @@ bool FPCGRecursiveArchElement::ExecuteInternal(FPCGContext* Context) const
         }
 
         // --------------------------------------------------------------------
-        // Write RecursionTier (int32) attribute to every point on this tier.
+        // Write RecursionTier (int32) + ArchitecturalRole (int32) + Walkable attributes.
         //
-        // FindOrCreateAttribute is the safe, idempotent PCG metadata API that
-        // either retrieves an existing attribute or creates it.  Writing per-
-        // point via SetValue ensures downstream attribute filters can select
-        // individual tiers (Requirement 4.4, design §5.1).
+        // Arch points are ArchitecturalRole=Column; only the base tier (d==0)
+        // is Walkable since upper arches are decorative overhead.
         // --------------------------------------------------------------------
         UPCGMetadata* Metadata = TierData->Metadata;
         check(Metadata);
 
         FPCGMetadataAttribute<int32>* TierAttr =
             Metadata->FindOrCreateAttribute<int32>(
-                RecursionTierAttributeName,
+                FMelodiaPCGAttrs::RecursionTierAttr,
                 /*DefaultValue=*/ 0,
                 /*bAllowsInterpolation=*/ false,
                 /*bOverrideParent=*/ true);
 
+        FPCGMetadataAttribute<int32>* RoleAttr =
+            Metadata->FindOrCreateAttribute<int32>(
+                FMelodiaPCGAttrs::ArchitecturalRoleAttr,
+                static_cast<int32>(EPCGArchitecturalRole::Column),
+                /*bAllowsInterpolation=*/ false,
+                /*bOverrideParent=*/ true);
+
+        FPCGMetadataAttribute<bool>* WalkAttr =
+            Metadata->FindOrCreateAttribute<bool>(
+                FMelodiaPCGAttrs::WalkableAttr,
+                (d == 0),  // only base tier is walkable
+                /*bAllowsInterpolation=*/ false,
+                /*bOverrideParent=*/ true);
+
+        FPCGMetadataAttribute<float>* SlopeAttr =
+            Metadata->FindOrCreateAttribute<float>(
+                FMelodiaPCGAttrs::SlopeAngleAttr,
+                0.f,
+                /*bAllowsInterpolation=*/ true,
+                /*bOverrideParent=*/ true);
+
         if (TierAttr)
         {
-            for (FPCGPoint& Pt : Points)
+            const int32 ColumnRole = static_cast<int32>(EPCGArchitecturalRole::Column);
+            const bool bBaseWalkable = (d == 0);
+            for (int32 PtIdx = 0; PtIdx < Points.Num(); ++PtIdx)
             {
+                FPCGPoint& Pt = Points[PtIdx];
                 if (Pt.MetadataEntry == PCGInvalidEntryKey)
                 {
                     Metadata->InitializeOnSet(Pt.MetadataEntry);
                 }
                 TierAttr->SetValue(Pt.MetadataEntry, d);
+                if (RoleAttr) RoleAttr->SetValue(Pt.MetadataEntry, ColumnRole);
+                if (WalkAttr) WalkAttr->SetValue(Pt.MetadataEntry, bBaseWalkable);
+
+                // Slope angle: arch surface is steepest at the base, flat at the apex.
+                // angle_i = PI * i / (N-1);  slope = |90 - angle_degrees|.
+                if (SlopeAttr && (N > 1))
+                {
+                    const float AngleDeg = 180.f * static_cast<float>(PtIdx) / static_cast<float>(N - 1);
+                    const float Slope = FMath::Abs(90.f - AngleDeg);
+                    SlopeAttr->SetValue(Pt.MetadataEntry, Slope);
+                }
             }
         }
         else

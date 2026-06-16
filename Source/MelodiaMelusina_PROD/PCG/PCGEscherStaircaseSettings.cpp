@@ -22,15 +22,20 @@
 //   NewObject<> which is context-lifetime managed by the PCG framework.
 
 #include "PCGEscherStaircaseSettings.h"
+#include "PCGMelodiaAttributes.h"
 
 #ifndef MELODIA_ENABLE_EXPERIMENTAL_PCG
-#define MELODIA_ENABLE_EXPERIMENTAL_PCG 0
+#define MELODIA_ENABLE_EXPERIMENTAL_PCG 1
 #endif
 
 #if MELODIA_ENABLE_EXPERIMENTAL_PCG
 
 #include "PCGContext.h"
+#include "PCGModule.h"
 #include "Data/PCGPointData.h"
+#include "Metadata/PCGMetadata.h"
+#include "Metadata/PCGMetadataAttribute.h"
+#include "Metadata/PCGMetadataAttributeTpl.h"
 #include "PCGPin.h"
 #include "Logging/LogMacros.h"
 #include "Math/UnrealMathUtility.h"
@@ -47,13 +52,6 @@
 #endif
 
 // ---------------------------------------------------------------------------
-// Cycle-stat definition — paired with the DECLARE_CYCLE_STAT_EXTERN in the header.
-// Requirement 12.3: ExecuteInternal is wrapped in SCOPE_CYCLE_COUNTER so the
-//   Unreal Insights / stat system can verify the ≤ 16 ms budget at runtime.
-// ---------------------------------------------------------------------------
-DEFINE_CYCLE_STAT(TEXT("PCGEscherElement"), STAT_PCGEscherElement, STATGROUP_PCG);
-
-// ---------------------------------------------------------------------------
 // UPCGEscherStaircaseSettings::CreateElement
 // ---------------------------------------------------------------------------
 
@@ -68,9 +66,7 @@ FPCGElementPtr UPCGEscherStaircaseSettings::CreateElement() const
 
 bool FPCGEscherStaircaseElement::ExecuteInternal(FPCGContext* Context) const
 {
-    // Wrap the entire execution body in the cycle-counter scope so the
-    // profiler measures the full cost of this element (Requirement 12.3).
-    SCOPE_CYCLE_COUNTER(STAT_PCGEscherElement);
+    TRACE_CPUPROFILER_EVENT_SCOPE(FPCGEscherStaircaseElement::ExecuteInternal);
 
     check(Context);
 
@@ -162,6 +158,49 @@ bool FPCGEscherStaircaseElement::ExecuteInternal(FPCGContext* Context) const
         LastLoc.Y = Y0;
         LastLoc.Z = 0.f;
         LastPt.Transform.SetLocation(LastLoc);
+    }
+
+    // -----------------------------------------------------------------------
+    // 4b. Write ArchitecturalRole + Walkable attributes
+    //     Every stair point is ArchitecturalRole=Stair and Walkable=true
+    //     (stair treads are designed to be walked on).
+    // -----------------------------------------------------------------------
+    {
+        UPCGMetadata* Metadata = OutputData->Metadata;
+        check(Metadata);
+
+        FPCGMetadataAttribute<int32>* RoleAttr =
+            Metadata->FindOrCreateAttribute<int32>(
+                FMelodiaPCGAttrs::ArchitecturalRoleAttr,
+                static_cast<int32>(EPCGArchitecturalRole::Stair),
+                /*bAllowsInterpolation=*/ false,
+                /*bOverrideParent=*/ true);
+
+        FPCGMetadataAttribute<bool>* WalkAttr =
+            Metadata->FindOrCreateAttribute<bool>(
+                FMelodiaPCGAttrs::WalkableAttr,
+                true,
+                /*bAllowsInterpolation=*/ false,
+                /*bOverrideParent=*/ true);
+
+        FPCGMetadataAttribute<float>* SlopeAttr =
+            Metadata->FindOrCreateAttribute<float>(
+                FMelodiaPCGAttrs::SlopeAngleAttr,
+                0.f,  // stairs are effectively flat walkable surfaces
+                /*bAllowsInterpolation=*/ true,
+                /*bOverrideParent=*/ true);
+
+        const int32 StairRole = static_cast<int32>(EPCGArchitecturalRole::Stair);
+        for (FPCGPoint& Pt : Points)
+        {
+            if (Pt.MetadataEntry == PCGInvalidEntryKey)
+            {
+                Metadata->InitializeOnSet(Pt.MetadataEntry);
+            }
+            if (RoleAttr)  RoleAttr->SetValue(Pt.MetadataEntry, StairRole);
+            if (WalkAttr)  WalkAttr->SetValue(Pt.MetadataEntry, true);
+            if (SlopeAttr) SlopeAttr->SetValue(Pt.MetadataEntry, 0.f);
+        }
     }
 
     // -----------------------------------------------------------------------

@@ -7,6 +7,8 @@
 #include "MelodiaBattleLoopLibrary.h"
 #include "MelodiaBattleInputComponent.generated.h"
 
+class UMelodiaRhythmExecutionComponent;
+
 UCLASS(Blueprintable, ClassGroup=(Melodia), meta=(BlueprintSpawnableComponent))
 class MELODIAMELUSINA_PROD_API UMelodiaBattleInputComponent : public UActorComponent
 {
@@ -57,6 +59,9 @@ public:
 	bool HandleUltimateInput();
 
 private:
+	UMelodiaRhythmExecutionComponent* EnsureExecutionComponent();
+	bool IsBattleInputAllowed() const;
+	bool TryConfirmVictoryReward();
 	bool ExecuteInputCommand(EMelodiaRhythmBattleCommand Command);
 	void OnBasicInputPressed();
 	void OnSkillInputPressed();

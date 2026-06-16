@@ -116,7 +116,23 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Combat")
 	int32 TotalEnemyTurnDelayApplyCount = 0;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Combat")
+	float PartyHP = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Combat")
+	float PartyMaxHP = 100.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Combat")
+	float LastPartyDamageTaken = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Combat")
+	int32 EnemyTurnCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Combat")
+	bool bUltimateUsedThisBattle = false;
+
 	UFUNCTION(BlueprintCallable, Category="Melodia|Combat")
+	float ApplyPartyDamage(float Damage);
 	float AddUltimateGauge(float Delta);
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Combat")

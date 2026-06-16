@@ -29,6 +29,7 @@ void UMelodiaCombatStateComponent::RecordUltimateActivated(const float Damage)
 	LastUltimateDamage = FMath::Max(0.0f, Damage);
 	UltimateGauge = 0.0f;
 	bUltimateReady = false;
+	bUltimateUsedThisBattle = true;
 	++UltimateActivationCount;
 	++TotalUltimateActivationCount;
 }
@@ -95,6 +96,7 @@ void UMelodiaCombatStateComponent::ResetActionEconomy()
 	EnemyTurnDelayStacks = 0;
 	LastEnemyTurnDelay = 0;
 	EnemyTurnDelayApplyCount = 0;
+	bUltimateUsedThisBattle = false;
 	ResetEnemyToughness();
 }
 
@@ -193,4 +195,16 @@ void UMelodiaCombatStateComponent::ResetEnemyToughness()
 	LastFollowUpBonusDamage = 0.0f;
 	EnemyTurnDelayStacks = 0;
 	LastEnemyTurnDelay = 0;
+	PartyHP = PartyMaxHP;
+	LastPartyDamageTaken = 0.0f;
+	EnemyTurnCount = 0;
+}
+
+float UMelodiaCombatStateComponent::ApplyPartyDamage(const float Damage)
+{
+	const float SafeDamage = FMath::Max(0.0f, Damage);
+	LastPartyDamageTaken = SafeDamage;
+	PartyMaxHP = FMath::Max(1.0f, PartyMaxHP);
+	PartyHP = FMath::Max(0.0f, PartyHP - SafeDamage);
+	return LastPartyDamageTaken;
 }

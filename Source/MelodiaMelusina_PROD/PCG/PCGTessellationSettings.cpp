@@ -31,9 +31,10 @@
 //   NewObject<> whose lifetime is managed by the PCG framework.
 
 #include "PCGTessellationSettings.h"
+#include "PCGMelodiaAttributes.h"
 
 #ifndef MELODIA_ENABLE_EXPERIMENTAL_PCG
-#define MELODIA_ENABLE_EXPERIMENTAL_PCG 0
+#define MELODIA_ENABLE_EXPERIMENTAL_PCG 1
 #endif
 
 #if MELODIA_ENABLE_EXPERIMENTAL_PCG
@@ -63,11 +64,6 @@
 
 namespace PCGTessellation
 {
-    // ------------------------------------------------------------------
-    // Attribute name used for every output point (Requirement 1.6, 3.3)
-    // ------------------------------------------------------------------
-    static const FName TileTypeAttrName(TEXT("TileType"));
-
     // ------------------------------------------------------------------
     // Compute the axis-aligned bounding box from a set of input points,
     // or return a 2000 × 2000 cm default centred on the origin when the
@@ -101,10 +97,8 @@ namespace PCGTessellation
     }
 
     // ------------------------------------------------------------------
-    // Write the TileType int32 attribute to every point in the output set.
-    //
-    // Uses FindOrCreateAttribute + SetValue-per-point, matching the
-    // pattern established in PCGGravityZoneSettings.cpp.
+    // Write the TileType int32 attribute + ArchitecturalRole + Walkable
+    // to every point in the output set.
     // ------------------------------------------------------------------
     static void WriteAttribute(UPCGPointData* Data, int32 TileType)
     {
@@ -114,30 +108,40 @@ namespace PCGTessellation
 
         FPCGMetadataAttribute<int32>* Attr =
             Meta->FindOrCreateAttribute<int32>(
-                TileTypeAttrName,
+                FMelodiaPCGAttrs::TileTypeAttr,
                 0,                        // default value
                 /*bAllowsInterpolation=*/ false,
                 /*bOverrideParent=*/ true);
 
-        if (!Attr)
-        {
-            UE_LOG(LogPCG, Warning,
-                   TEXT("PCGTessellationElement: Failed to create TileType attribute."));
-            return;
-        }
+        FPCGMetadataAttribute<int32>* RoleAttr =
+            Meta->FindOrCreateAttribute<int32>(
+                FMelodiaPCGAttrs::ArchitecturalRoleAttr,
+                static_cast<int32>(EPCGArchitecturalRole::Tile),
+                /*bAllowsInterpolation=*/ false,
+                /*bOverrideParent=*/ true);
 
+        FPCGMetadataAttribute<bool>* WalkAttr =
+            Meta->FindOrCreateAttribute<bool>(
+                FMelodiaPCGAttrs::WalkableAttr,
+                true,  // tessellation tiles are floor surfaces
+                /*bAllowsInterpolation=*/ false,
+                /*bOverrideParent=*/ true);
+
+        const int32 TileRole = static_cast<int32>(EPCGArchitecturalRole::Tile);
         for (FPCGPoint& Pt : Data->GetMutablePoints())
         {
             if (Pt.MetadataEntry == PCGInvalidEntryKey)
             {
                 Meta->InitializeOnSet(Pt.MetadataEntry);
             }
-            Attr->SetValue(Pt.MetadataEntry, TileType);
+            if (Attr)     Attr->SetValue(Pt.MetadataEntry, TileType);
+            if (RoleAttr) RoleAttr->SetValue(Pt.MetadataEntry, TileRole);
+            if (WalkAttr) WalkAttr->SetValue(Pt.MetadataEntry, true);
         }
     }
 
     // ------------------------------------------------------------------
-    // Write TileType per-point using a pre-built parallel array of types.
+    // Write TileType per-point + ArchitecturalRole + Walkable.
     // Used by the Penrose generator which has mixed TileType values.
     // ------------------------------------------------------------------
     static void WriteAttributePerPoint(UPCGPointData* Data,
@@ -151,19 +155,24 @@ namespace PCGTessellation
 
         FPCGMetadataAttribute<int32>* Attr =
             Meta->FindOrCreateAttribute<int32>(
-                TileTypeAttrName,
-                0,
+                FMelodiaPCGAttrs::TileTypeAttr, 0,
                 /*bAllowsInterpolation=*/ false,
                 /*bOverrideParent=*/ true);
 
-        if (!Attr)
-        {
-            UE_LOG(LogPCG, Warning,
-                   TEXT("PCGTessellationElement: Failed to create TileType attribute "
-                        "(per-point path)."));
-            return;
-        }
+        FPCGMetadataAttribute<int32>* RoleAttr =
+            Meta->FindOrCreateAttribute<int32>(
+                FMelodiaPCGAttrs::ArchitecturalRoleAttr,
+                static_cast<int32>(EPCGArchitecturalRole::Tile),
+                /*bAllowsInterpolation=*/ false,
+                /*bOverrideParent=*/ true);
 
+        FPCGMetadataAttribute<bool>* WalkAttr =
+            Meta->FindOrCreateAttribute<bool>(
+                FMelodiaPCGAttrs::WalkableAttr, true,
+                /*bAllowsInterpolation=*/ false,
+                /*bOverrideParent=*/ true);
+
+        const int32 TileRole = static_cast<int32>(EPCGArchitecturalRole::Tile);
         TArray<FPCGPoint>& Points = Data->GetMutablePoints();
         for (int32 i = 0; i < Points.Num(); ++i)
         {
@@ -172,7 +181,9 @@ namespace PCGTessellation
             {
                 Meta->InitializeOnSet(Pt.MetadataEntry);
             }
-            Attr->SetValue(Pt.MetadataEntry, TileTypes[i]);
+            if (Attr)     Attr->SetValue(Pt.MetadataEntry, TileTypes[i]);
+            if (RoleAttr) RoleAttr->SetValue(Pt.MetadataEntry, TileRole);
+            if (WalkAttr) WalkAttr->SetValue(Pt.MetadataEntry, true);
         }
     }
 

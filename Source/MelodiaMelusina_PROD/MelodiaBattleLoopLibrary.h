@@ -6,6 +6,8 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "MelodiaBattleLoopLibrary.generated.h"
 
+struct FMelodiaHighwayNote;
+
 UENUM(BlueprintType)
 enum class EMelodiaRhythmBattleCommand : uint8
 {
@@ -56,8 +58,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop", meta=(DefaultToSelf="WorldContextObject"))
 	static bool TriggerRhythmUltimate(UObject* WorldContextObject, AActor* BattleController);
 
+	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop", meta=(DefaultToSelf="WorldContextObject"))
+	static bool ApplyRhythmExecutionResult(UObject* WorldContextObject, AActor* BattleController, const TArray<FMelodiaHighwayNote>& NoteResults, bool bSkillAction, float SkillScalar, int32 SkillCost);
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop", meta=(DefaultToSelf="WorldContextObject"))
+	static bool ExecuteEnemyTurn(UObject* WorldContextObject, AActor* BattleController);
+
+	UFUNCTION(BlueprintPure, Category="Melodia|Battle Loop")
+	static bool IsPartyDefeated(AActor* BattleController);
+
 	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop")
 	static void ResetRhythmBattleEncounter(AActor* BattleController);
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop")
+	static void ConfirmRhythmVictoryReward(AActor* BattleController);
 
 private:
 	static const FName RhythmVictoryResolvedTag;
@@ -71,6 +85,5 @@ private:
 	static void SetBoolPropertyValue(AActor* Actor, FName PropertyName, bool bValue);
 	static bool ApplyRhythmBattleAction(UObject* WorldContextObject, AActor* BattleController, float Grade, int32 ComboToWin, bool bSkillAction);
 	static void PublishReactiveCommandState(AActor* BattleController, const FString& CommandName, const FString& IntentName, float IntentPower, bool bUltimateWindow, bool bUltimateInterrupt);
-	static void ConfirmRhythmVictoryReward(AActor* BattleController);
 	static void ResolveRhythmVictory(UObject* WorldContextObject, AActor* BattleController, float RemainingHP);
 };

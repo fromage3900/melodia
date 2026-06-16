@@ -80,6 +80,44 @@
       ]
     }
   },
+  "escher_nikki": {
+    "description": "Escher / Infinity Nikki tier mesh collections for impossible-geometry and floating-island graphs. Placeholder entries marked for authoring.",
+    "PCGCol_EscherNikki_Stairs": {
+      "tag": "stair",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/houseassets/SM_corridor", "weight": 2, "tags": ["tread", "flat"], "note": "Use as flat tread placeholder; replace with dedicated stair-step mesh when authored." }
+      ]
+    },
+    "PCGCol_EscherNikki_Tiles": {
+      "tag": "tile",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/houseassets/SM_ceilingsquare", "weight": 3, "tags": ["square_tile"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_MarbleSlabOutline", "weight": 2, "tags": ["slab_tile"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_MarbleSlabOutline_007", "weight": 2, "tags": ["slab_tile"] }
+      ]
+    },
+    "PCGCol_EscherNikki_Organic": {
+      "tag": "organic",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallcurved", "weight": 1, "tags": ["vine"], "note": "Replace with authored vine/tendril mesh." },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallshort", "weight": 1, "tags": ["moss"], "note": "Replace with moss-cluster mesh." }
+      ]
+    },
+    "PCGCol_EscherNikki_IslandRocks": {
+      "tag": "rock",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_001", "weight": 1, "tags": ["rock_small"], "note": "Replace with authored rock-cluster mesh." },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_002", "weight": 1, "tags": ["rock_medium"], "note": "Replace with authored rock-cluster mesh." }
+      ]
+    },
+    "PCGCol_EscherNikki_Railings": {
+      "tag": "railing",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_004", "weight": 1, "tags": ["rail_post"], "note": "Replace with dedicated railing post mesh." },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_005", "weight": 1, "tags": ["rail_bar"], "note": "Replace with dedicated railing bar mesh." }
+      ]
+    }
+  },
   "module_grid_cm": {
     "wall_width": 400,
     "wall_height": 600,

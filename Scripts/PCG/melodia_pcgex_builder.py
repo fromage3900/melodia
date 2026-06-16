@@ -768,6 +768,62 @@ def build_pilaster_ex(catalog: dict, sub_spawn_path: str) -> str:
     return path
 
 
+def build_sub_walkability_filter(catalog: dict) -> str:
+    """Subgraph that filters input points by walkability (line-trace probe).
+
+    Uses PCGExTrace or vanilla DensityFilter to keep only points on walkable
+    surfaces (≤ 50° slope).  Downstream spawners receive clean, floor-snapped
+    points suitable for encounter-trigger and enemy placement.
+    """
+    name = "PCG_Sub_WalkabilityFilter"
+    graph, path = create_graph_asset(
+        name,
+        SUBGRAPH_PACKAGE,
+        "Filter points by walkability: keep only floor-level, low-slope hits.",
+    )
+    clear_user_nodes(graph)
+    output_node = graph.get_output_node()
+    output_node.set_node_position(1200, 0)
+
+    # --- Trace / ray-cast node to find floor beneath each point ---
+    trace_node, trace_settings, used_trace = add_node_or_fallback(
+        graph,
+        "PCGExTraceSettings",         # PCGEx: full ray-trace
+        "PCGDensityFilterSettings",    # vanilla fallback
+        300,
+        0,
+    )
+    if used_trace == "PCGExTraceSettings":
+        try:
+            trace_settings.set_editor_property("TraceChannel", unreal.TraceTypeQuery.ECC_WorldStatic)
+            trace_settings.set_editor_property("TraceLength", 4000.0)
+            trace_settings.set_editor_property("bTraceDown", True)
+        except Exception:  # noqa: BLE001
+            pass
+
+    # --- Filter node: remove points whose surface normal exceeds 50° ---
+    filter_node, filter_settings, _ = add_node_or_fallback(
+        graph,
+        "PCGExUberFilterSettings",
+        "PCGPointFilterSettings",
+        600,
+        0,
+    )
+
+    # --- Project-to-surface: snap surviving points to the floor ---
+    project_node, _, _ = add_node_or_fallback(
+        graph,
+        "PCGExProjectAlongSettings",
+        "PCGTransformPointsSettings",
+        900,
+        0,
+    )
+
+    wire_chain(graph, [trace_node, filter_node, project_node], output_node)
+    save_and_reload(path)
+    return path
+
+
 def build_entry_ex(catalog: dict) -> str:
     name = "PCG_BaroqueEntryEx"
     graph, path = create_graph_asset(
@@ -842,6 +898,9 @@ def build_all(force_rebuild: bool = False) -> list[str]:
     paths.append(build_atrium_ex(catalog, sub_column, sub_spawn))
     paths.append(build_balcony_ex(catalog, sub_spawn))
     paths.append(build_pilaster_ex(catalog, sub_spawn))
+    sub_walk = build_sub_walkability_filter(catalog)
+    paths.append(sub_walk)
+
     paths.append(build_entry_ex(catalog))
 
     unreal.log(f"melodia_pcgex_builder: created/updated {len(paths)} graphs.")
@@ -864,6 +923,7 @@ def build_graph(graph_name: str) -> str:
             "PCG_Sub_BaroqueAlongPath": lambda: build_sub_baroque_along_path(
                 catalog, sub_spawn
             ),
+            "PCG_Sub_WalkabilityFilter": lambda: build_sub_walkability_filter(catalog),
             "PCG_BaroqueColonnadeEx": lambda: build_colonnade_ex(catalog, sub_column),
             "PCG_BaroqueFacadeEx": lambda: build_facade_ex(catalog, sub_spawn),
             "PCG_BaroqueRotundaEx": lambda: build_rotunda_ex(catalog, sub_column),

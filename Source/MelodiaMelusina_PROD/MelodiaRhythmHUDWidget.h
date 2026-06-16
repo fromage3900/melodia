@@ -4,10 +4,34 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "MelodiaQuestTypes.h"
+#include "MelodiaRhythmExecutionComponent.h"
 #include "MelodiaRhythmHUDWidget.generated.h"
 
 class UTextBlock;
 class UWidget;
+
+// Single floating combat-text entry (damage popup) tracked for native painting.
+USTRUCT(BlueprintType)
+struct FMelodiaFloatingCombatText
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	FString Text;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float SpawnTime = -1000.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	bool bAnchorEnemy = true;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	FLinearColor Tint = FLinearColor::White;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float LateralSeed = 0.0f;
+};
 
 UCLASS(Blueprintable)
 class MELODIAMELUSINA_PROD_API UMelodiaRhythmHUDWidget : public UUserWidget
@@ -97,6 +121,42 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Rhythm HUD")
 	void TriggerDamageFlash(float DamageValue);
 	virtual void TriggerDamageFlash_Implementation(float DamageValue);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Rhythm HUD")
+	void SetPartyVitals(float CurrentHP, float MaxHP);
+	virtual void SetPartyVitals_Implementation(float CurrentHP, float MaxHP);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Rhythm HUD")
+	void SetNoteHighwayActive(bool bActive, const TArray<FMelodiaHighwayNote>& Notes, float BeatPosition, float ScrollBeatsAhead);
+	virtual void SetNoteHighwayActive_Implementation(bool bActive, const TArray<FMelodiaHighwayNote>& Notes, float BeatPosition, float ScrollBeatsAhead);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Rhythm HUD")
+	void SetBattlePhaseBanner(const FString& PhaseLabel);
+	virtual void SetBattlePhaseBanner_Implementation(const FString& PhaseLabel);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Rhythm HUD")
+	void PushFloatingCombatText(const FString& Text, bool bAnchorEnemy, FLinearColor Tint);
+	virtual void PushFloatingCombatText_Implementation(const FString& Text, bool bAnchorEnemy, FLinearColor Tint);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Exploration HUD")
+	void SetQuestLogEntries(const TArray<FString>& Entries, const FString& ToastText);
+	virtual void SetQuestLogEntries_Implementation(const TArray<FString>& Entries, const FString& ToastText);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Exploration HUD")
+	void SetInventorySlots(const TArray<FMelodiaInventorySlot>& Slots);
+	virtual void SetInventorySlots_Implementation(const TArray<FMelodiaInventorySlot>& Slots);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Exploration HUD")
+	void SetInventoryPanelOpen(bool bOpen);
+	virtual void SetInventoryPanelOpen_Implementation(bool bOpen);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Exploration HUD")
+	void SetMinimapState(FVector MapCenterWorld, float MapHalfExtentCm, FVector PlayerWorldLocation, const TArray<FMelodiaMinimapMarker>& Markers);
+	virtual void SetMinimapState_Implementation(FVector MapCenterWorld, float MapHalfExtentCm, FVector PlayerWorldLocation, const TArray<FMelodiaMinimapMarker>& Markers);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Exploration HUD")
+	void SetMinimapMarkers(const TArray<FMelodiaMinimapMarker>& Markers);
+	virtual void SetMinimapMarkers_Implementation(const TArray<FMelodiaMinimapMarker>& Markers);
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
 	FString LastBattleStatusText;
@@ -227,6 +287,108 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
 	float LastDamageFlashTime = -1000.0f;
 
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	FString LastTurnBannerText;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float LastTurnBannerTime = -1000.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	FLinearColor LastTurnBannerTint = FLinearColor(1.0f, 0.86f, 0.42f, 1.0f);
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	int32 TurnBannerCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float LastFloatingDamageValue = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float LastFloatingDamageTime = -1000.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	bool bLastFloatingDamageAgainstEnemy = true;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	FLinearColor LastFloatingDamageTint = FLinearColor(1.0f, 0.95f, 0.6f, 1.0f);
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	int32 FloatingDamageCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	FString LastBattlePhaseLabel;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float LastBattlePhaseTime = -1000.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	int32 BattlePhaseUpdateCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	TArray<FMelodiaFloatingCombatText> FloatingCombatTexts;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	int32 FloatingCombatTextCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float LastPartyHP = 100.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float LastPartyMaxHP = 100.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	int32 PartyVitalsUpdateCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	bool bNoteHighwayActive = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	TArray<FMelodiaHighwayNote> HighwayNotes;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float HighwayBeatPosition = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	float HighwayScrollBeatsAhead = 2.5f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	int32 NoteHighwayUpdateCount = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Exploration HUD")
+	bool bDrawExplorationHUD = true;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	TArray<FString> QuestLogEntries;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	FString LastQuestToastText;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	TArray<FMelodiaInventorySlot> InventorySlots;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	bool bInventoryPanelOpen = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	FVector MinimapCenterWorld = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	float MinimapHalfExtentCm = 800.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	FVector MinimapPlayerLocation = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	TArray<FMelodiaMinimapMarker> MinimapMarkers;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	int32 QuestLogUpdateCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	int32 InventoryUpdateCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	int32 MinimapUpdateCount = 0;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm HUD|Style")
 	bool bDrawNativeCuteCombatHUD = true;
 
@@ -282,7 +444,44 @@ public:
 	int32 NativePortraitPaintCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD|Style")
+	int32 NativeHighwayPaintCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD|Style")
+	int32 NativePartyVitalsPaintCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD|Style")
+	int32 NativeMinimapPaintCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD|Style")
+	int32 NativeQuestLogPaintCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD|Style")
+	int32 NativeInventoryPaintCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD|Style")
 	float LastSparkleBurstTime = -1000.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD|Style")
+	int32 NativeBannerPaintCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD|Style")
+	int32 NativeFloatingTextPaintCount = 0;
+
+	// Smoothed (lerped) bar values driven in NativeTick so gauges drain instead of snapping.
+	UPROPERTY(BlueprintReadOnly, Transient, Category="Melodia|Rhythm HUD|Style")
+	float DisplayedEnemyHP = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Transient, Category="Melodia|Rhythm HUD|Style")
+	float DisplayedPartyHP = 100.0f;
+
+	UPROPERTY(BlueprintReadOnly, Transient, Category="Melodia|Rhythm HUD|Style")
+	float DisplayedUltimate = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Transient, Category="Melodia|Rhythm HUD|Style")
+	float DisplayedEnemyToughness = 100.0f;
+
+	UPROPERTY(Transient)
+	bool bDisplayedValuesInitialized = false;
 
 protected:
 	UWidget* FindWidgetByName(FName WidgetName) const;
@@ -302,7 +501,18 @@ private:
 	mutable int32 MutableNativeDamageFlashPaintCount = 0;
 	mutable int32 MutableNativeLabelPaintCount = 0;
 	mutable int32 MutableNativePortraitPaintCount = 0;
+	mutable int32 MutableNativeHighwayPaintCount = 0;
+	mutable int32 MutableNativePartyVitalsPaintCount = 0;
+	mutable int32 MutableNativeMinimapPaintCount = 0;
+	mutable int32 MutableNativeQuestLogPaintCount = 0;
+	mutable int32 MutableNativeInventoryPaintCount = 0;
+	mutable int32 MutableNativeBannerPaintCount = 0;
+	mutable int32 MutableNativeFloatingTextPaintCount = 0;
 
 	float GetHUDTimeSeconds() const;
+	void UpdateSmoothedBars(float InDeltaTime);
+	void SyncExplorationHUDFromWorld();
+	FVector2f WorldToMinimap(const FVector2f& LocalSize, const FVector& WorldLocation) const;
+	void PaintExplorationHUD(FSlateWindowElementList& OutDrawElements, const FGeometry& AllottedGeometry, int32& CurrentLayer) const;
 	void SyncMutablePaintStats() const;
 };

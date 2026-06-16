@@ -16,8 +16,8 @@ bool FMelodiaRhythmRulesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Perfect multiplier is capped at 1.5"), Perfect.CombatMultiplier, 1.5f);
 	TestTrue(TEXT("Perfect counts as hit"), Perfect.bCountsAsHit);
 
-	const FMelodiaRhythmGradeResult Great = UMelodiaCoreRulesLibrary::GradeInputFromTimingErrorMs(75.0f, Windows);
-	TestEqual(TEXT("75 ms grades Great"), Great.Grade, EMelodiaRhythmGrade::Great);
+	const FMelodiaRhythmGradeResult Great = UMelodiaCoreRulesLibrary::GradeInputFromTimingErrorMs(110.0f, Windows);
+	TestEqual(TEXT("110 ms grades Great"), Great.Grade, EMelodiaRhythmGrade::Great);
 
 	const FMelodiaRhythmGradeResult Good = UMelodiaCoreRulesLibrary::GradeInputFromTimingErrorMs(140.0f, Windows);
 	TestEqual(TEXT("140 ms grades Good"), Good.Grade, EMelodiaRhythmGrade::Good);

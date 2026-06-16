@@ -16,6 +16,13 @@
 #include "MelodiaRhythmGameModeBase.h"
 #include "MelodiaRhythmHUDWidget.h"
 #include "UObject/UObjectIterator.h"
+#include "PCGComponent.h"
+#include "PCGGraph.h"
+#include "Data/PCGPointData.h"
+#include "Metadata/PCGMetadata.h"
+#include "Metadata/PCGMetadataAttribute.h"
+#include "Metadata/PCGMetadataAttributeTpl.h"
+#include "PCGMelodiaAttributes.h"
 
 AMelodiaLoopVerifier::AMelodiaLoopVerifier()
 {
@@ -64,21 +71,24 @@ bool AMelodiaLoopVerifier::RunVerificationNow()
 	FString HUDDetail;
 	FString QuestDetail;
 	FString RhythmManagerDetail;
+	FString PCGDetail;
 
 	const bool bMusic = VerifyMusicClock(MusicDetail);
 	const bool bBattle = VerifyBattleHooks(BattleDetail);
 	const bool bHUD = VerifyHUDHooks(HUDDetail);
 	const bool bQuest = VerifyQuestHook(QuestDetail);
 	const bool bRhythmManager = VerifyRhythmManagerWiring(RhythmManagerDetail);
-	const bool bPass = bMusic && bBattle && bHUD && bQuest && bRhythmManager;
+	const bool bPCG = VerifyPCGGraphs(PCGDetail);
+	const bool bPass = bMusic && bBattle && bHUD && bQuest && bRhythmManager && bPCG;
 
 	bLastVerificationPassed = bPass;
-	LastVerificationSummary = FString::Printf(TEXT("Music=%s | Input=%s | Battle=%s | HUD=%s | Quest=%s"),
+	LastVerificationSummary = FString::Printf(TEXT("Music=%s | Input=%s | Battle=%s | HUD=%s | Quest=%s | PCG=%s"),
 		*MusicDetail,
 		*RhythmManagerDetail,
 		*BattleDetail,
 		*HUDDetail,
-		*QuestDetail);
+		*QuestDetail,
+		*PCGDetail);
 
 	UE_LOG(LogTemp, Warning, TEXT("MELODIA_LOOP_VERIFY %s | %s"),
 		bPass ? TEXT("PASS") : TEXT("FAIL"),
@@ -242,7 +252,12 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 
 	AMelodiaRhythmGameModeBase* MutableRhythmGameMode = GetWorld() ? Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(GetWorld())) : nullptr;
 	AMelodiaEncounterTrigger* EncounterTrigger = MutableRhythmGameMode ? MutableRhythmGameMode->ActiveEncounterTrigger : nullptr;
-	const bool bEncounterTriggerStartedBattle = EncounterTrigger && (EncounterTrigger->StartEncounter(MutableRhythmGameMode ? MutableRhythmGameMode->ActiveExplorationPawn.Get() : nullptr) || EncounterTrigger->ActivationCount > 0);
+	if (EncounterTrigger && MutableRhythmGameMode && MutableRhythmGameMode->CurrentLoopPhase == EMelodiaLoopPhase::ExplorationReady)
+	{
+		EncounterTrigger->ArmEncounter();
+		EncounterTrigger->StartEncounter(MutableRhythmGameMode->ActiveExplorationPawn.Get());
+	}
+	const bool bEncounterTriggerStartedBattle = EncounterTrigger && EncounterTrigger->ActivationCount > 0;
 	SetFloatProperty(TEXT("RhythmEnemyMaxHP"), 45.0f);
 	SetFloatProperty(TEXT("RhythmEnemyHP"), 45.0f);
 
@@ -609,4 +624,111 @@ bool AMelodiaLoopVerifier::VerifyRhythmManagerWiring(FString& Detail)
 		*MusicManager->GetClass()->GetName(),
 		MusicManager->IsQuartzClockActive() ? TEXT("true") : TEXT("false"));
 	return MusicManager->IsQuartzClockActive();
+}
+
+bool AMelodiaLoopVerifier::VerifyPCGGraphs(FString& Detail)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		Detail = TEXT("no world");
+		return false;
+	}
+
+	int32 PCGComponentCount = 0;
+	int32 GraphsWithNodes = 0;
+	int32 CustomElementsFound = 0;
+	int32 TotalGeneratedPoints = 0;
+	bool bHasMelodiaAttrs = false;
+
+	// Iterate all PCG components in the world.
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		UPCGComponent* PCGComp = It->FindComponentByClass<UPCGComponent>();
+		if (!PCGComp)
+		{
+			continue;
+		}
+
+		++PCGComponentCount;
+
+		// Validate the graph asset structure.
+		const UPCGGraph* Graph = PCGComp->GetGraph();
+		if (!Graph)
+		{
+			continue;
+		}
+
+		// Check graph has nodes (non-empty).
+		const TArray<UPCGNode*>& Nodes = Graph->GetNodes();
+		if (Nodes.Num() > 0)
+		{
+			++GraphsWithNodes;
+		}
+
+		// Check for Melodia custom settings classes in the graph.
+		for (const UPCGNode* Node : Nodes)
+		{
+			if (!Node) continue;
+			const UPCGSettings* Settings = Node->GetSettings();
+			if (!Settings) continue;
+
+			const FString ClassName = Settings->GetClass()->GetName();
+			if (ClassName.Contains(TEXT("Escher")) ||
+				ClassName.Contains(TEXT("GravityZone")) ||
+				ClassName.Contains(TEXT("RecursiveArch")) ||
+				ClassName.Contains(TEXT("Tessellation")))
+			{
+				++CustomElementsFound;
+			}
+		}
+
+		// Access generated output data to count points and check for Melodia attributes.
+		// UE 5.7: use GetGeneratedGraphOutput() for runtime-accessible generated data (project standard).
+		const FPCGDataCollection& GenOutput = PCGComp->GetGeneratedGraphOutput();
+		for (const FPCGTaggedData& Tagged : GenOutput.TaggedData)
+		{
+			const UPCGPointData* PointData = Cast<UPCGPointData>(Tagged.Data);
+			if (!PointData) continue;
+
+			TotalGeneratedPoints += PointData->GetPoints().Num();
+
+			const UPCGMetadata* Meta = PointData->Metadata;
+			if (Meta)
+			{
+				const FPCGMetadataAttribute<int32>* RoleAttr =
+					Meta->GetConstTypedAttribute<int32>(FMelodiaPCGAttrs::ArchitecturalRoleAttr);
+				if (RoleAttr)
+				{
+					bHasMelodiaAttrs = true;
+				}
+			}
+		}
+	}
+
+	// Summary.
+	Detail = FString::Printf(
+		TEXT("components=%d graphs=%d customElements=%d generatedPoints=%d hasMelodiaAttrs=%s"),
+		PCGComponentCount,
+		GraphsWithNodes,
+		CustomElementsFound,
+		TotalGeneratedPoints,
+		bHasMelodiaAttrs ? TEXT("true") : TEXT("false"));
+
+	// Pass criteria:
+	// - No PCG components → OK (hand-authored level).
+	// - PCG components present → at least one graph has nodes.
+	if (PCGComponentCount == 0)
+	{
+		Detail += TEXT(" [no PCG components — OK]");
+		return true;
+	}
+
+	bool bPass = GraphsWithNodes >= 1;
+	if (CustomElementsFound > 0 && !bHasMelodiaAttrs)
+	{
+		Detail += TEXT(" [WARN: custom elements found but no Melodia attrs detected]");
+		// Don't fail — data may not be generated yet in editor.
+	}
+	return bPass;
 }

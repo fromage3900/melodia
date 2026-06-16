@@ -10,6 +10,8 @@ public class MelodiaMelusina_PROD : ModuleRules
 	
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "AudioMixer", "UMG", "Slate", "SlateCore", "PCG" });
 
+		PublicIncludePaths.Add(System.IO.Path.Combine(ModuleDirectory, "PCG"));
+
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 		
 		// Uncomment if you are using online features

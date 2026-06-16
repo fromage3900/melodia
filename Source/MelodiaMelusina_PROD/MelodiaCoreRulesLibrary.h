@@ -30,12 +30,15 @@ struct FMelodiaRhythmWindows
 {
 	GENERATED_BODY()
 
+	/** ±90 ms — canonical per FOUNDATION §4A. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm")
-	float PerfectWindowMs = 50.0f;
+	float PerfectWindowMs = 90.0f;
 
+	/** ±120 ms — intermediate tier between Perfect and Good. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm")
-	float GreatWindowMs = 100.0f;
+	float GreatWindowMs = 120.0f;
 
+	/** ±160 ms — canonical per FOUNDATION §4A. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm")
 	float GoodWindowMs = 160.0f;
 

@@ -42,7 +42,7 @@ During a battle in the template Gameplay map, the player taps **Space / Left-Mou
 | Knob | Where | Default | Notes |
 |---|---|---|---|
 | BPM | `BP_RhythmTestBattleManager` BeginPlay → `PlayMusic` BPM pin | 128 | Beat length = 60/BPM. |
-| Timing windows | `BP_RhythmInputValidator` `PerfectWindow`/`GreatWindow`/`GoodWindow` | 0.1 / 0.2 / 0.3 s | ⚠️ See §5. |
+| Timing windows | `FMelodiaRhythmWindows` (C++) `PerfectWindowMs`/`GreatWindowMs`/`GoodWindowMs` | 90 / 120 / 160 ms | Canonical per FOUNDATION §4A. Blueprint `BP_RhythmInputValidator` still uses legacy 100/200/300 ms — override at runtime via the C++ struct. |
 | Tier multipliers | `ValidateInputTiming` Set DamageMultiplier nodes | 2.0 / 1.5 / 1.2 / 0.5 | Clamped to 0.4–1.5 in `SetRhythmMultiplier`. |
 | Combo bonus | `BP_BattleController.SetRhythmMultiplier` | +0.05 / step | |
 | Rating-word thresholds | `BP_RhythmTestBattleManager.GetRatingWord` | 1.75 / 1.35 / 0.85 | Aligned to the tier multipliers. |
@@ -50,9 +50,18 @@ During a battle in the template Gameplay map, the player taps **Space / Left-Mou
 
 ---
 
-## 5. Known tuning issue — MISS is unreachable at 128 BPM
+## 5. Tuning note — timing windows
 
-Beat length 0.469s → max possible timing error = half a beat ≈ **0.234s**, which is *less than* `GoodWindow` (0.3s). So every tap lands Good-or-better; a real MISS can't happen. To make the full Perfect→Miss range reachable at 128 BPM, tighten to approximately **Perfect 0.05 / Great 0.10 / Good 0.16**. This is a feel decision — left to playtest. (Edit the three window vars on `BP_RhythmInputValidator`.)
+The authoritative timing windows live in `FMelodiaRhythmWindows` (C++ `MelodiaCoreRulesLibrary.h`):
+
+| Grade | Window | Multiplier |
+|-------|--------|------------|
+| Perfect | ±90 ms | 1.5× |
+| Great | ±120 ms | 1.25× |
+| Good | ±160 ms | 1.0× |
+| Miss | >160 ms | 0.4× |
+
+At 128 BPM (beat length 0.469 s), max timing error ≈ 234 ms, so Miss IS reachable with the 160 ms Good window. The Blueprint `BP_RhythmInputValidator` still ships with legacy wider windows (100/200/300 ms) — override them at runtime by feeding the C++ struct, or edit the Blueprint variables to match. Multipliers are defined in `MelodiaCoreRulesLibrary.cpp` (`MelodiaCoreRules` namespace).
 
 ---
 

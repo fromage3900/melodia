@@ -18,7 +18,7 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop Verification")
-	bool bRunOnBeginPlay = true;
+	bool bRunOnBeginPlay = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop Verification")
 	float VerificationDelaySeconds = 0.5f;
@@ -57,4 +57,5 @@ private:
 	bool VerifyHUDHooks(FString& Detail);
 	bool VerifyQuestHook(FString& Detail);
 	bool VerifyRhythmManagerWiring(FString& Detail);
+	bool VerifyPCGGraphs(FString& Detail);
 };

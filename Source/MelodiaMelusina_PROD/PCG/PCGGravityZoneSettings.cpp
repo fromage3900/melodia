@@ -6,9 +6,10 @@
 // Design: §2.4 (Execute contracts), §5.4 (GravityDir propagation)
 
 #include "PCGGravityZoneSettings.h"
+#include "PCGMelodiaAttributes.h"
 
 #ifndef MELODIA_ENABLE_EXPERIMENTAL_PCG
-#define MELODIA_ENABLE_EXPERIMENTAL_PCG 0
+#define MELODIA_ENABLE_EXPERIMENTAL_PCG 1
 #endif
 
 #if MELODIA_ENABLE_EXPERIMENTAL_PCG
@@ -65,9 +66,6 @@ bool FPCGGravityZoneElement::ExecuteInternal(FPCGContext* Context) const
 		return true;
 	}
 
-	// The attribute name we stamp onto every point.
-	static const FName GravityDirAttributeName(TEXT("GravityDir"));
-
 	TArray<FPCGTaggedData>& OutputData = Context->OutputData.TaggedData;
 
 	for (const FPCGTaggedData& TaggedInput : InputData)
@@ -102,7 +100,7 @@ bool FPCGGravityZoneElement::ExecuteInternal(FPCGContext* Context) const
 
 		FPCGMetadataAttribute<FVector>* GravityAttr =
 			Metadata->FindOrCreateAttribute<FVector>(
-				GravityDirAttributeName,
+				FMelodiaPCGAttrs::GravityDirAttr,
 				FVector(0.f, 0.f, -1.f),   // default value (standard gravity)
 				/*bAllowsInterpolation=*/ false,
 				/*bOverrideParent=*/ true);
@@ -116,20 +114,36 @@ bool FPCGGravityZoneElement::ExecuteInternal(FPCGContext* Context) const
 		else
 		{
 			// Stamp the normalised GravityDir onto every output point.
-			// Each FPCGPoint carries a MetadataEntry key that maps it to a row in the
-			// metadata table.  We call SetValue on each key so the attribute is written
-			// per-point rather than as a shared default (required for downstream
-			// attribute-based filtering to see distinct values when multiple zones with
-			// different GravityDir values are merged).
+			// Also compute Walkable + SlopeAngle from gravity alignment.
+			FPCGMetadataAttribute<bool>* WalkAttr =
+				Metadata->FindOrCreateAttribute<bool>(
+					FMelodiaPCGAttrs::WalkableAttr, true,
+					/*bAllowsInterpolation=*/ false,
+					/*bOverrideParent=*/ true);
+
+			FPCGMetadataAttribute<float>* SlopeAttr =
+				Metadata->FindOrCreateAttribute<float>(
+					FMelodiaPCGAttrs::SlopeAngleAttr, 0.f,
+					/*bAllowsInterpolation=*/ true,
+					/*bOverrideParent=*/ true);
+
+			// Slope angle: deviation of GravityDir from standard down (0,0,-1).
+			const float GravityAngle = FMath::RadiansToDegrees(
+				FMath::Acos(FMath::Clamp(
+					FVector::DotProduct(GravityDir, FVector(0.f, 0.f, -1.f)),
+					-1.f, 1.f)));
+			const bool bWalkable = GravityAngle <= 50.f;
+
 			for (FPCGPoint& Pt : DstPoints)
 			{
-				// Allocate a metadata entry for this point if it doesn't have one yet.
 				if (Pt.MetadataEntry == PCGInvalidEntryKey)
 				{
 					Metadata->InitializeOnSet(Pt.MetadataEntry);
 				}
 
 				GravityAttr->SetValue(Pt.MetadataEntry, GravityDir);
+				if (WalkAttr) WalkAttr->SetValue(Pt.MetadataEntry, bWalkable);
+				if (SlopeAttr) SlopeAttr->SetValue(Pt.MetadataEntry, GravityAngle);
 			}
 		}
 

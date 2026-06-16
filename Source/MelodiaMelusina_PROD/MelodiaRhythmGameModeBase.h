@@ -4,12 +4,21 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "PCGMelodiaAttributes.h"
 #include "MelodiaRhythmGameModeBase.generated.h"
 
+class AController;
+class APlayerController;
 class AMelodiaMusicManager;
 class AMelodiaLoopVerifier;
 class APawn;
 class AMelodiaEncounterTrigger;
+class AMelodiaReverieRunManager;
+class AMelodiaRestPoint;
+class AMelodiaPortal;
+class AMelodiaPCGEncounterSpawner;
+class AMelodiaPCGWalkableIndex;
+class UPCGComponent;
 class UMelodiaCosmeticsComponent;
 class UMelodiaBattleInputComponent;
 class UMelodiaRhythmHUDWidget;
@@ -29,6 +38,11 @@ class MELODIAMELUSINA_PROD_API AMelodiaRhythmGameModeBase : public AGameModeBase
 	GENERATED_BODY()
 
 public:
+	AMelodiaRhythmGameModeBase();
+
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+	virtual void RestartPlayer(AController* NewPlayer) override;
+	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void BeginPlay() override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
@@ -50,19 +64,48 @@ public:
 	FSoftClassPath BattleControllerClassPath = FSoftClassPath(TEXT("/Game/TurnBasedJRPGTemplate/Blueprints/Battle/BP_BattleController.BP_BattleController_C"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
+	FSoftClassPath BattleDataClassPath = FSoftClassPath(TEXT("/Game/Blueprints/Gameplay/BP_PhoenixRhythmPlaytestBattle.BP_PhoenixRhythmPlaytestBattle_C"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	FSoftClassPath QuestManagerClassPath = FSoftClassPath(TEXT("/Game/Melodia/Core/BP_QuestManager.BP_QuestManager_C"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	FSoftClassPath ExplorationPawnClassPath = FSoftClassPath(TEXT("/Game/Blueprints/Gameplay/BP_Melusina.BP_Melusina_C"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
-	FVector ExplorationReturnLocation = FVector(-10480.0f, -5000.0f, -2140.0f);
+	FVector ExplorationReturnLocation = FVector(-10680.0f, -5000.0f, -2140.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	FVector EncounterTriggerLocation = FVector(-10240.0f, -5000.0f, -2140.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
-	bool bRunLoopVerifier = true;
+	float EncounterTriggerForwardOffset = 440.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
+	bool bRunLoopVerifier = false;
+
+	/** When true, place encounters/rest/portal from PCG walkable data instead of hardcoded offsets. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|PCG")
+	bool bUsePCGPlacement = true;
+
+	/** Radius (cm) around the PCG volume center used for walkable-point queries. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|PCG", meta=(ClampMin="500"))
+	float PCGPlacementSearchRadius = 15000.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|PCG")
+	TObjectPtr<AMelodiaPCGWalkableIndex> ActiveWalkableIndex;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|PCG")
+	TObjectPtr<AMelodiaPCGEncounterSpawner> ActivePCGEncounterSpawner;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|PCG")
+	int32 PCGWalkablePointCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|PCG")
+	int32 PCGSpawnedEncounterCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|PCG")
+	bool bPCGPlacementActive = false;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
 	EMelodiaLoopPhase CurrentLoopPhase = EMelodiaLoopPhase::Bootstrapping;
@@ -90,6 +133,15 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
 	TObjectPtr<AMelodiaEncounterTrigger> ActiveEncounterTrigger;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
+	TObjectPtr<AMelodiaReverieRunManager> ActiveReverieRunManager;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
+	TObjectPtr<AMelodiaRestPoint> ActiveRestPoint;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
+	TObjectPtr<AMelodiaPortal> ActivePortal;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Presentation")
 	TObjectPtr<UMelodiaCosmeticsComponent> ActiveCosmeticsComponent;
@@ -128,11 +180,30 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
 	TObjectPtr<AMelodiaMusicManager> ActiveMusicManager;
 
+	FTimerHandle BootstrapRetryHandle;
+	FTimerHandle PCGPlacementRetryHandle;
+	int32 PCGPlacementRetryCount = 0;
+	static constexpr int32 MaxPCGPlacementRetries = 20;
+
 	UClass* ResolveClass(const FSoftClassPath& ClassPath) const;
 	AActor* FindExistingActorOfClass(UClass* ActorClass) const;
 	AActor* SpawnLoopActor(UClass* ActorClass, const FVector& Location, const FRotator& Rotation) const;
+	FVector ResolveExplorationSpawnLocation() const;
+	FVector ResolveEncounterTriggerLocation() const;
+	void SyncExplorationLocations();
+	void FinishLoopBootstrap();
+	void RetryExplorationBootstrap();
+	bool ShouldRunLoopVerifier() const;
 	void RestoreExplorationControl();
 	void EnsureEncounterTrigger();
+	void EnsureReverieRunManager();
+	void EnsureWorldInteractions();
+	void EnsurePCGGameplayPlacement();
+	void RetryPCGGameplayPlacement();
+	UPCGComponent* FindPrimaryPCGComponent() const;
+	FVector FindPCGWorldCenter() const;
+	bool TryResolveWalkableLocation(const FVector& Hint, EPCGArchitecturalRole PreferredRole, float SearchRadius, FVector& OutLocation) const;
+	void ApplyPCGPlacedInteractables();
 	void EnsureBattleInputBridge();
 	void EnsureRhythmHUDWidget();
 	void ApplyMelusinaPresentation(APawn* ExplorationPawn);
