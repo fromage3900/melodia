@@ -21,6 +21,7 @@
 #include "PCGMelodiaAttributes.h"
 #include "MelodiaRhythmGameModeBase.generated.h"
 
+class AMelodiaCharacterBase;
 class AController;
 class APlayerController;
 class AMelodiaMusicManager;
@@ -83,6 +84,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	FSoftClassPath QuestManagerClassPath = FSoftClassPath(TEXT("/Game/Melodia/Core/BP_QuestManager.BP_QuestManager_C"));
 
+	/** Reparent BP_Melusina to AMelodiaCharacterBase for baked-in components. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	FSoftClassPath ExplorationPawnClassPath = FSoftClassPath(TEXT("/Game/Blueprints/Gameplay/BP_Melusina.BP_Melusina_C"));
 

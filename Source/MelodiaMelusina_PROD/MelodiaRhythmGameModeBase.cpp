@@ -12,6 +12,7 @@
 #include "GameFramework/Controller.h"
 #include "Kismet/GameplayStatics.h"
 #include "MelodiaBattleInputComponent.h"
+#include "MelodiaCharacterBase.h"
 #include "MelodiaCosmeticsComponent.h"
 #include "MelodiaEncounterTrigger.h"
 #include "MelodiaExplorationInputComponent.h"
@@ -43,6 +44,12 @@ void AMelodiaRhythmGameModeBase::InitGame(const FString& MapName, const FString&
 	if (UClass* ExplorationPawnClass = ResolveClass(ExplorationPawnClassPath))
 	{
 		DefaultPawnClass = ExplorationPawnClass;
+	}
+	else if (DefaultPawnClass == nullptr)
+	{
+		DefaultPawnClass = AMelodiaCharacterBase::StaticClass();
+		UE_LOG(LogTemp, Warning, TEXT("Melodia loop bootstrap falling back to native AMelodiaCharacterBase (could not resolve %s)."),
+			*ExplorationPawnClassPath.ToString());
 	}
 	else
 	{
@@ -452,23 +459,30 @@ void AMelodiaRhythmGameModeBase::RestoreExplorationControl()
 	ActiveExplorationPawn = ExplorationPawn;
 	ExplorationPawn->SetActorLocation(ExplorationReturnLocation, false, nullptr, ETeleportType::TeleportPhysics);
 
-	if (!ExplorationPawn->FindComponentByClass<UMelodiaInventoryComponent>())
+	if (AMelodiaCharacterBase* MelusinaCharacter = Cast<AMelodiaCharacterBase>(ExplorationPawn))
 	{
-		if (UMelodiaInventoryComponent* Inventory = NewObject<UMelodiaInventoryComponent>(ExplorationPawn, UMelodiaInventoryComponent::StaticClass(), TEXT("MelodiaInventory")))
-		{
-			Inventory->RegisterComponent();
-			ExplorationPawn->AddInstanceComponent(Inventory);
-			Inventory->SeedStarterKit();
-		}
+		MelusinaCharacter->InitializeExplorationSystems();
 	}
-
-	if (!ExplorationPawn->FindComponentByClass<UMelodiaExplorationInputComponent>())
+	else
 	{
-		if (UMelodiaExplorationInputComponent* ExplorationInput = NewObject<UMelodiaExplorationInputComponent>(ExplorationPawn, UMelodiaExplorationInputComponent::StaticClass(), TEXT("MelodiaExplorationInput")))
+		if (!ExplorationPawn->FindComponentByClass<UMelodiaInventoryComponent>())
 		{
-			ExplorationInput->RegisterComponent();
-			ExplorationPawn->AddInstanceComponent(ExplorationInput);
-			ExplorationInput->BindExplorationInput();
+			if (UMelodiaInventoryComponent* Inventory = NewObject<UMelodiaInventoryComponent>(ExplorationPawn, UMelodiaInventoryComponent::StaticClass(), TEXT("MelodiaInventory")))
+			{
+				Inventory->RegisterComponent();
+				ExplorationPawn->AddInstanceComponent(Inventory);
+				Inventory->SeedStarterKit();
+			}
+		}
+
+		if (!ExplorationPawn->FindComponentByClass<UMelodiaExplorationInputComponent>())
+		{
+			if (UMelodiaExplorationInputComponent* ExplorationInput = NewObject<UMelodiaExplorationInputComponent>(ExplorationPawn, UMelodiaExplorationInputComponent::StaticClass(), TEXT("MelodiaExplorationInput")))
+			{
+				ExplorationInput->RegisterComponent();
+				ExplorationPawn->AddInstanceComponent(ExplorationInput);
+				ExplorationInput->BindExplorationInput();
+			}
 		}
 	}
 
@@ -505,10 +519,23 @@ void AMelodiaRhythmGameModeBase::ApplyMelusinaPresentation(APawn* ExplorationPaw
 		return;
 	}
 
-	bMelusinaPawnActive = ExplorationPawn->GetClass()->GetName().Contains(TEXT("Melusina"));
+	bMelusinaPawnActive = ExplorationPawn->GetClass()->GetName().Contains(TEXT("Melusina"))
+		|| ExplorationPawn->IsA<AMelodiaCharacterBase>();
 	if (bMelusinaPawnActive)
 	{
 		++MelusinaPawnApplyCount;
+	}
+
+	if (AMelodiaCharacterBase* MelusinaCharacter = Cast<AMelodiaCharacterBase>(ExplorationPawn))
+	{
+		MelusinaCharacter->ApplyMelusinaPresentation();
+		ActiveCosmeticsComponent = MelusinaCharacter->GetCosmeticsComponent();
+		if (ActiveCosmeticsComponent)
+		{
+			LastCosmeticPresetText = ActiveCosmeticsComponent->LastAppliedPresetId.ToString();
+		}
+		EnsureRhythmHUDWidget();
+		return;
 	}
 
 	UMelodiaCosmeticsComponent* CosmeticsComponent = ExplorationPawn->FindComponentByClass<UMelodiaCosmeticsComponent>();

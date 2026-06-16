@@ -427,9 +427,11 @@ int32 UMelodiaRhythmHUDWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 			}
 
 			const FVector2f NotePosition = LanePosition + V2f(NormalizedX - NoteWidth * 0.5f, (LaneHeight - NoteHeight) * 0.5f);
-			const FLinearColor NoteTint = Note.bResolved
-				? GradeTint(Note.Grade, SparkleTint)
-				: FLinearColor(SparkleTint.R, SparkleTint.G, SparkleTint.B, 0.88f);
+			FLinearColor NoteTint(SparkleTint.R, SparkleTint.G, SparkleTint.B, 0.88f);
+			if (Note.bResolved)
+			{
+				NoteTint = GradeTint(Note.Grade, SparkleTint);
+			}
 			const FSlateBrush NoteBrush = MakeTintBrush(NoteTint);
 			FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 2, PaintBox(AllottedGeometry, NotePosition, V2f(NoteWidth, NoteHeight)), &NoteBrush, ESlateDrawEffect::None, NoteTint);
 

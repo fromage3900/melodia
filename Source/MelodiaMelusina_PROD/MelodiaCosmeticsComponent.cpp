@@ -2,6 +2,7 @@
 
 #include "MelodiaCosmeticsComponent.h"
 
+#include "GameFramework/Character.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
@@ -64,5 +65,18 @@ bool UMelodiaCosmeticsComponent::ApplyDefaultMelusinaPreset()
 USkeletalMeshComponent* UMelodiaCosmeticsComponent::FindTargetMesh() const
 {
 	const AActor* Owner = GetOwner();
-	return Owner ? Owner->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+	if (!Owner)
+	{
+		return nullptr;
+	}
+
+	if (const ACharacter* Character = Cast<ACharacter>(Owner))
+	{
+		if (USkeletalMeshComponent* CharacterMesh = Character->GetMesh())
+		{
+			return CharacterMesh;
+		}
+	}
+
+	return Owner->FindComponentByClass<USkeletalMeshComponent>();
 }
