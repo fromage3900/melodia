@@ -84,9 +84,9 @@ FString InitialForName(const FString& Name)
 	return Name.Left(1).ToUpper();
 }
 
-FLinearColor GradeTint(const EMelodiaRhythmGrade Grade, const FLinearColor& DefaultTint)
+FLinearColor MelodiaGradeTint(const EMelodiaRhythmGrade RhythmGrade, const FLinearColor& DefaultTint)
 {
-	switch (Grade)
+	switch (RhythmGrade)
 	{
 	case EMelodiaRhythmGrade::Perfect:
 		return FLinearColor(0.42f, 1.0f, 0.72f, 0.98f);
@@ -430,7 +430,7 @@ int32 UMelodiaRhythmHUDWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 			FLinearColor NoteTint(SparkleTint.R, SparkleTint.G, SparkleTint.B, 0.88f);
 			if (Note.bResolved)
 			{
-				NoteTint = GradeTint(Note.Grade, SparkleTint);
+				NoteTint = MelodiaGradeTint(Note.Grade, SparkleTint);
 			}
 			const FSlateBrush NoteBrush = MakeTintBrush(NoteTint);
 			FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 2, PaintBox(AllottedGeometry, NotePosition, V2f(NoteWidth, NoteHeight)), &NoteBrush, ESlateDrawEffect::None, NoteTint);
