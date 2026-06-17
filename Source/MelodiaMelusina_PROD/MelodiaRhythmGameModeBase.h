@@ -322,6 +322,7 @@ protected:
 	bool TryResolveWalkableLocation(const FVector& Hint, EPCGArchitecturalRole PreferredRole, float SearchRadius, FVector& OutLocation) const;
 	void ApplyPCGPlacedInteractables();
 	void EnsureBattleInputBridge();
+	void RemoveStaleRhythmHUDWidgets();
 	void EnsureRhythmHUDWidget();
 	void PrepareMelodiaBattleView();
 	void AutoConfirmVictoryIfPending();

@@ -245,6 +245,19 @@ FLinearColor MelodiaGradeTint(const EMelodiaRhythmGrade RhythmGrade, const FLine
 }
 }
 
+void UMelodiaRhythmHUDWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	EnforceNativeHSRPresentation();
+}
+
+void UMelodiaRhythmHUDWidget::EnforceNativeHSRPresentation()
+{
+	bDrawNativeCuteCombatHUD = true;
+	bCompactBattleHUD = true;
+	ApplyCuteCombatTheme();
+}
+
 void UMelodiaRhythmHUDWidget::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);

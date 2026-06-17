@@ -749,6 +749,51 @@ void AMelodiaRhythmGameModeBase::ApplyMelusinaPresentation(APawn* ExplorationPaw
 	}
 }
 
+void AMelodiaRhythmGameModeBase::RemoveStaleRhythmHUDWidgets()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (UClass* RhythmHUDActorClass = ResolveClass(RhythmHUDActorClassPath))
+	{
+		TArray<AActor*> LegacyActors;
+		for (TActorIterator<AActor> It(World, RhythmHUDActorClass); It; ++It)
+		{
+			LegacyActors.Add(*It);
+		}
+		for (AActor* Actor : LegacyActors)
+		{
+			if (Actor)
+			{
+				Actor->Destroy();
+			}
+		}
+	}
+
+	TArray<UMelodiaRhythmHUDWidget*> ExistingWidgets;
+	for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+	{
+		if (It->GetWorld() == World)
+		{
+			ExistingWidgets.Add(*It);
+		}
+	}
+
+	for (UMelodiaRhythmHUDWidget* Widget : ExistingWidgets)
+	{
+		if (Widget)
+		{
+			Widget->RemoveFromParent();
+		}
+	}
+
+	ActiveRhythmHUDWidget = nullptr;
+	bRhythmHUDWidgetInViewport = false;
+}
+
 void AMelodiaRhythmGameModeBase::EnsureRhythmHUDWidget()
 {
 	UWorld* World = GetWorld();
@@ -759,45 +804,37 @@ void AMelodiaRhythmGameModeBase::EnsureRhythmHUDWidget()
 
 	if (ActiveRhythmHUDWidget)
 	{
-		ActiveRhythmHUDWidget->ApplyCuteCombatTheme();
+		ActiveRhythmHUDWidget->EnforceNativeHSRPresentation();
 		ActiveRhythmHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 		bRhythmHUDWidgetInViewport = true;
 		return;
 	}
 
 	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(World, 0);
-	if (PlayerController)
-	{
-		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
-		{
-			if (It->GetWorld() == World && It->GetOwningPlayer() == PlayerController)
-			{
-				ActiveRhythmHUDWidget = *It;
-				ActiveRhythmHUDWidget->ApplyCuteCombatTheme();
-				ActiveRhythmHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-				bRhythmHUDWidgetInViewport = true;
-				UE_LOG(LogTemp, Log, TEXT("Melodia loop adopted existing player-owned rhythm HUD widget."));
-				return;
-			}
-		}
-	}
-
-	UClass* WidgetClass = ResolveClass(RhythmHUDWidgetClassPath);
-	if (!WidgetClass)
-	{
-		WidgetClass = UMelodiaRhythmHUDWidget::StaticClass();
-		UE_LOG(LogTemp, Warning, TEXT("Melodia loop fell back to native UMelodiaRhythmHUDWidget."));
-	}
-	if (!WidgetClass)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Melodia loop could not load rhythm HUD widget class: %s"), *RhythmHUDWidgetClassPath.ToString());
-		return;
-	}
-
 	if (!PlayerController)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Melodia loop could not add rhythm HUD widget yet: no player controller."));
 		return;
+	}
+
+	if (bHSRStyleBattle)
+	{
+		RemoveStaleRhythmHUDWidgets();
+	}
+
+	UClass* WidgetClass = nullptr;
+	if (bHSRStyleBattle)
+	{
+		WidgetClass = UMelodiaRhythmHUDWidget::StaticClass();
+	}
+	else
+	{
+		WidgetClass = ResolveClass(RhythmHUDWidgetClassPath);
+		if (!WidgetClass)
+		{
+			WidgetClass = UMelodiaRhythmHUDWidget::StaticClass();
+			UE_LOG(LogTemp, Warning, TEXT("Melodia loop fell back to native UMelodiaRhythmHUDWidget."));
+		}
 	}
 
 	ActiveRhythmHUDWidget = CreateWidget<UMelodiaRhythmHUDWidget>(PlayerController, WidgetClass);
@@ -806,10 +843,11 @@ void AMelodiaRhythmGameModeBase::EnsureRhythmHUDWidget()
 		ActiveRhythmHUDWidget->AddToViewport(40);
 		ActiveRhythmHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 		ActiveRhythmHUDWidget->bDrawExplorationHUD = CurrentLoopPhase != EMelodiaLoopPhase::Battle;
-		ActiveRhythmHUDWidget->ApplyCuteCombatTheme();
+		ActiveRhythmHUDWidget->EnforceNativeHSRPresentation();
 		ActiveRhythmHUDWidget->TriggerSparkleBurst();
 		bRhythmHUDWidgetInViewport = true;
-		UE_LOG(LogTemp, Log, TEXT("Melodia loop added native rhythm HUD widget to viewport."));
+		UE_LOG(LogTemp, Log, TEXT("Melodia loop added native rhythm HUD widget to viewport (class=%s)."),
+			*WidgetClass->GetName());
 	}
 }
 
