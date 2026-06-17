@@ -12,6 +12,7 @@
 #include "PCG/MelodiaPCGDecorationSpawner.h"
 #include "MelodiaQuestManagerBase.h"
 #include "PCGGraph.h"
+#include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
 AMelodiaReverieRunManager::AMelodiaReverieRunManager()
@@ -38,6 +39,12 @@ void AMelodiaReverieRunManager::BeginPlay()
 	{
 		StartRun(RunSeed);
 	}
+}
+
+void AMelodiaReverieRunManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindPCGGenerationDelegate();
+	Super::EndPlay(EndPlayReason);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +144,7 @@ void AMelodiaReverieRunManager::OnAreaGenerationComplete()
 	// Notify the game mode that exploration is ready.
 	if (AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(this)))
 	{
+		GameMode->NotifyReverieAreaGenerationComplete();
 		GameMode->SetLoopPhase(EMelodiaLoopPhase::ExplorationReady);
 	}
 }
@@ -234,15 +242,53 @@ void AMelodiaReverieRunManager::GenerateCurrentArea()
 	// Set the seed on the PCG component (UE 5.7 removed SetSeed; assign the property).
 	PCGComp->Seed = AreaSeed;
 
-	// Trigger generation.
+	UnbindPCGGenerationDelegate();
+	ObservedPCGComponent = PCGComp;
+	bAwaitingPCGGeneration = true;
+	PCGGenerationDelegateHandle = PCGComp->OnPCGGraphGeneratedDelegate.AddUObject(
+		this, &AMelodiaReverieRunManager::HandlePCGGraphGenerated);
+
 	PCGComp->Generate();
 	UE_LOG(LogTemp, Log, TEXT("ReverieRunManager: Triggered PCG generation for area %d '%s' (seed=%d)."),
 		CurrentAreaIndex, *Area.AreaDisplayName, AreaSeed);
 
-	// In a full implementation we'd bind to the PCG component's OnGenerationCompleted
-	// delegate.  For the skeleton, we call OnAreaGenerationComplete directly since
-	// PCG generation is synchronous in-editor when not using async generation.
+	if (!PCGComp->IsGenerating() && GetWorld())
+	{
+		GetWorld()->GetTimerManager().SetTimerForNextTick(
+			FTimerDelegate::CreateUObject(this, &AMelodiaReverieRunManager::TryCompleteAreaAfterGeneration));
+	}
+}
+
+void AMelodiaReverieRunManager::HandlePCGGraphGenerated(UPCGComponent* Component)
+{
+	if (!bAwaitingPCGGeneration || Component != ObservedPCGComponent.Get())
+	{
+		return;
+	}
+
+	bAwaitingPCGGeneration = false;
+	UnbindPCGGenerationDelegate();
 	OnAreaGenerationComplete();
+}
+
+void AMelodiaReverieRunManager::TryCompleteAreaAfterGeneration()
+{
+	if (bAwaitingPCGGeneration)
+	{
+		HandlePCGGraphGenerated(ObservedPCGComponent.Get());
+	}
+}
+
+void AMelodiaReverieRunManager::UnbindPCGGenerationDelegate()
+{
+	if (PCGGenerationDelegateHandle.IsValid())
+	{
+		if (UPCGComponent* PCGComp = ObservedPCGComponent.Get())
+		{
+			PCGComp->OnPCGGraphGeneratedDelegate.Remove(PCGGenerationDelegateHandle);
+		}
+		PCGGenerationDelegateHandle.Reset();
+	}
 }
 
 UPCGComponent* AMelodiaReverieRunManager::FindPCGComponent() const

@@ -16,4 +16,6 @@ namespace MelodiaDevCheats
 	void ResetProgression(UWorld* World);
 	void DumpBattleState(UWorld* World);
 	void WinBattle(UWorld* World);
+	void PlayDemo(UWorld* World);
+	void PlayPCGDemo(UWorld* World);
 }

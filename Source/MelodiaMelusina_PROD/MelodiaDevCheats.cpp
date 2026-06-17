@@ -13,6 +13,7 @@
 #include "MelodiaBattleSession.h"
 #include "MelodiaCombatStateComponent.h"
 #include "MelodiaJRPGBridgeLibrary.h"
+#include "MelodiaMenuBridgeLibrary.h"
 #include "MelodiaMechanicProgressionSubsystem.h"
 #include "MelodiaRhythmGameModeBase.h"
 
@@ -197,6 +198,18 @@ void MelodiaDevCheats::WinBattle(UWorld* World)
 	UE_LOG(LogTemp, Warning, TEXT("Melodia.WinBattle: could not resolve victory (try Melodia.DumpBattle)."));
 }
 
+void MelodiaDevCheats::PlayDemo(UWorld* World)
+{
+	UMelodiaMenuBridgeLibrary::LaunchGameplayLoopTest(World);
+	UE_LOG(LogTemp, Log, TEXT("Melodia.PlayDemo: opening L_MelodiaGameplayLoopTest."));
+}
+
+void MelodiaDevCheats::PlayPCGDemo(UWorld* World)
+{
+	UMelodiaMenuBridgeLibrary::LaunchPCGDemo(World);
+	UE_LOG(LogTemp, Log, TEXT("Melodia.PlayPCGDemo: opening L_MelodiaPCGDemo (Terrace Garden PCG)."));
+}
+
 void MelodiaDevCheats::RegisterConsoleCommands()
 {
 	using namespace MelodiaDevCheatsPrivate;
@@ -234,6 +247,18 @@ void MelodiaDevCheats::RegisterConsoleCommands()
 		TEXT("Melodia.WinBattle"),
 		TEXT("Instantly resolve the current encounter as a win (PIE testing)."),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World) { MelodiaDevCheats::WinBattle(World); }),
+		ECVF_Cheat);
+
+	IConsoleManager::Get().RegisterConsoleCommand(
+		TEXT("Melodia.PlayDemo"),
+		TEXT("Open the Melodia gameplay loop test level (portfolio demo)."),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World) { MelodiaDevCheats::PlayDemo(World); }),
+		ECVF_Cheat);
+
+	IConsoleManager::Get().RegisterConsoleCommand(
+		TEXT("Melodia.PlayPCGDemo"),
+		TEXT("Open the Melodia PCG Terrace Garden demo (procedural environment + gameplay loop)."),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World) { MelodiaDevCheats::PlayPCGDemo(World); }),
 		ECVF_Cheat);
 
 	UE_LOG(LogTemp, Log, TEXT("Melodia dev cheats registered (~ key console in PIE)."));

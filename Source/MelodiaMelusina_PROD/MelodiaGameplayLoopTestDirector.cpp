@@ -13,6 +13,7 @@
 #include "MelodiaRestPoint.h"
 #include "MelodiaRhythmGameModeBase.h"
 #include "MelodiaWorldEnemy.h"
+#include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
 
 AMelodiaGameplayLoopTestDirector::AMelodiaGameplayLoopTestDirector()
@@ -53,12 +54,22 @@ void AMelodiaGameplayLoopTestDirector::BeginPlay()
 	}
 }
 
-bool AMelodiaGameplayLoopTestDirector::BuildLayout()
+bool AMelodiaGameplayLoopTestDirector::BuildLayout(bool bForceRebuild)
 {
 	UWorld* World = GetWorld();
-	if (!World || bLayoutBuilt)
+	if (!World)
 	{
 		return false;
+	}
+
+	if (bLayoutBuilt && !bForceRebuild)
+	{
+		return false;
+	}
+
+	if (bForceRebuild)
+	{
+		bLayoutBuilt = false;
 	}
 
 	EnsureDefaultFlowerOffsets();
@@ -269,10 +280,9 @@ void AMelodiaGameplayLoopTestDirector::EnsureArenaFloor()
 	Floor->Tags.Add(TEXT("Melodia.TestLoop.Floor"));
 	if (UStaticMeshComponent* Mesh = Floor->GetStaticMeshComponent())
 	{
-		static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
-		if (CubeMesh.Succeeded())
+		if (UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
 		{
-			Mesh->SetStaticMesh(CubeMesh.Object);
+			Mesh->SetStaticMesh(CubeMesh);
 		}
 		Mesh->SetWorldScale3D(FVector(50.0f, 50.0f, 0.5f));
 		Mesh->SetRelativeLocation(FVector(0.0f, 0.0f, -25.0f));

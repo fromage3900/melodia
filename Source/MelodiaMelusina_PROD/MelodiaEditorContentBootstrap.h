@@ -25,9 +25,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
 	static bool EnsureTestLoopLevelAsset();
 
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
+	static bool RepopulateGameplayLoopTestLevel();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
+	static bool EnsurePCGDemoLevelAsset();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
+	static bool RepopulatePCGDemoLevel();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
+	static bool EnsureMelodiaPortfolioMenuBridge();
+
 private:
 	static bool EnsureContentFolder(const FString& FolderPath);
 	static bool SaveNewDataAsset(UObject* Asset, const FString& ObjectPath);
 	static bool EnsureChildBlueprint(const FString& AssetPath, UClass* ParentClass);
+	static bool BakeGameplayLoopTestLayout(UWorld* World);
 };
 #endif

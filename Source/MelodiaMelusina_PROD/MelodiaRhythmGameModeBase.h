@@ -117,6 +117,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	bool bGameplayLoopTestMap = false;
 
+	/** PCG portfolio demo: Terrace Garden graph + walkable placement + Reverie run. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|PCG")
+	bool bPCGDemoMap = false;
+
 	/** When true, do not relocate level-placed encounter/rest/portal actors (test director owns layout). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	bool bPreferLevelPlacedLoopActors = false;
@@ -241,6 +245,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Melodia|Loop")
 	void ConfigureGameplayLoopTest(const FVector& PlayerSpawnLocation, const FVector& GateLocation);
 
+	UFUNCTION(BlueprintCallable, Category="Melodia|PCG")
+	void ConfigurePCGDemo();
+
+	/** Called by ReverieRunManager after PCG area generation finishes. */
+	UFUNCTION(BlueprintCallable, Category="Melodia|PCG")
+	void NotifyReverieAreaGenerationComplete();
+
 	UFUNCTION(BlueprintCallable, Category="Melodia|Presentation")
 	UMelodiaRhythmHUDWidget* EnsureActiveRhythmHUD();
 
@@ -300,6 +311,8 @@ protected:
 	void EnsureCompanionActor();
 	void EnsureProgressionNPCs();
 	void EnsureReverieRunManager();
+	void ConfigurePCGDemoReverieManager();
+	void StartPCGDemoRun();
 	void EnsureWorldInteractions();
 	void EnsurePortfolioFlowers();
 	void EnsurePCGGameplayPlacement();

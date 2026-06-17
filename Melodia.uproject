@@ -215,7 +215,7 @@
 		},
 		{
 			"Name": "UnrealMCP",
-			"Enabled": false
+			"Enabled": true
 		},
 		{
 			"Name": "IKRig",

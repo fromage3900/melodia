@@ -148,10 +148,17 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** Called when PCG generation completes for the current area. */
 	UFUNCTION(BlueprintCallable, Category = "Reverie|Internal")
 	void OnAreaGenerationComplete();
+
+	/** Bound to UPCGComponent::OnPCGGraphGeneratedDelegate for async-safe completion. */
+	void HandlePCGGraphGenerated(UPCGComponent* Component);
+
+	/** Fallback when generation finishes synchronously without firing the delegate. */
+	void TryCompleteAreaAfterGeneration();
 
 	/** Generate the sequence of areas for this run using the run seed. */
 	void GenerateAreaSequence();
@@ -175,6 +182,12 @@ protected:
 	void CleanupRunActors();
 
 private:
+	void UnbindPCGGenerationDelegate();
+
 	/** FStreamableHandle for async-loaded PCG graph assets. */
 	TSharedPtr<struct FStreamableHandle> ActiveStreamableHandle;
+
+	TWeakObjectPtr<UPCGComponent> ObservedPCGComponent;
+	FDelegateHandle PCGGenerationDelegateHandle;
+	bool bAwaitingPCGGeneration = false;
 };

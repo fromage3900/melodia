@@ -84,6 +84,11 @@ void AMelodiaRhythmGameModeBase::InitGame(const FString& MapName, const FString&
 		bPreferLevelPlacedLoopActors = true;
 		bUsePCGPlacement = false;
 	}
+	else if (FParse::Param(*Options, TEXT("PCGDemo"))
+		|| MapName.Contains(TEXT("MelodiaPCGDemo"), ESearchCase::IgnoreCase))
+	{
+		ConfigurePCGDemo();
+	}
 }
 
 void AMelodiaRhythmGameModeBase::RestartPlayer(AController* NewPlayer)
@@ -185,6 +190,11 @@ void AMelodiaRhythmGameModeBase::BeginPlay()
 	if (!bGameplayLoopTestMap)
 	{
 		EnsureReverieRunManager();
+		if (bPCGDemoMap)
+		{
+			ConfigurePCGDemoReverieManager();
+			StartPCGDemoRun();
+		}
 		EnsurePCGGameplayPlacement();
 	}
 	EnsureWorldInteractions();
@@ -1477,10 +1487,82 @@ void AMelodiaRhythmGameModeBase::EnsureBattleMusicClock()
 void AMelodiaRhythmGameModeBase::ConfigureGameplayLoopTest(const FVector& PlayerSpawnLocation, const FVector& GateLocation)
 {
 	bGameplayLoopTestMap = true;
+	bPCGDemoMap = false;
 	bPreferLevelPlacedLoopActors = true;
 	bUsePCGPlacement = false;
 	ExplorationReturnLocation = PlayerSpawnLocation;
 	EncounterTriggerLocation = GateLocation;
+}
+
+void AMelodiaRhythmGameModeBase::ConfigurePCGDemo()
+{
+	bPCGDemoMap = true;
+	bGameplayLoopTestMap = false;
+	bPreferLevelPlacedLoopActors = false;
+	bUsePCGPlacement = true;
+	bMinimalDemoMode = false;
+	ExplorationReturnLocation = FVector(0.0f, 0.0f, 120.0f);
+	EncounterTriggerLocation = FVector(800.0f, 0.0f, 120.0f);
+	PCGPlacementSearchRadius = 20000.0f;
+}
+
+void AMelodiaRhythmGameModeBase::NotifyReverieAreaGenerationComplete()
+{
+	if (!bUsePCGPlacement)
+	{
+		return;
+	}
+
+	RetryPCGGameplayPlacement();
+	SyncExplorationLocations();
+	EnsureWorldInteractions();
+	EnsurePortfolioFlowers();
+
+	if (AMelodiaQuestManagerBase* QuestManager = Cast<AMelodiaQuestManagerBase>(FindExistingActorOfClass(ResolveClass(QuestManagerClassPath))))
+	{
+		QuestManager->RegisterStarterQuests(EncounterTriggerLocation);
+	}
+	else if (AMelodiaQuestManagerBase* NativeQuestManager = Cast<AMelodiaQuestManagerBase>(FindExistingActorOfClass(AMelodiaQuestManagerBase::StaticClass())))
+	{
+		NativeQuestManager->RegisterStarterQuests(EncounterTriggerLocation);
+	}
+}
+
+void AMelodiaRhythmGameModeBase::ConfigurePCGDemoReverieManager()
+{
+	if (!ActiveReverieRunManager)
+	{
+		return;
+	}
+
+	ActiveReverieRunManager->bAutoGenerateOnBeginPlay = false;
+	ActiveReverieRunManager->AreasPerRun = 1;
+	ActiveReverieRunManager->RunSeed = 0;
+
+	if (ActiveReverieRunManager->AreaTemplates.IsEmpty())
+	{
+		FReverieAreaConfig TerraceGarden;
+		TerraceGarden.AreaDisplayName = TEXT("星灯 Terrace Garden");
+		TerraceGarden.PCGGraphAsset = FSoftObjectPath(
+			TEXT("/Game/_PROJECT/PCG/Graphs/PCG_TerraceGarden.PCG_TerraceGarden"));
+		TerraceGarden.MinEncounters = 1;
+		TerraceGarden.MaxEncounters = 2;
+		TerraceGarden.DifficultyMultiplier = 1.0f;
+		ActiveReverieRunManager->AreaTemplates.Add(TerraceGarden);
+	}
+}
+
+void AMelodiaRhythmGameModeBase::StartPCGDemoRun()
+{
+	if (!bPCGDemoMap || !ActiveReverieRunManager)
+	{
+		return;
+	}
+
+	if (ActiveReverieRunManager->RunState == EReverieRunState::Idle)
+	{
+		ActiveReverieRunManager->StartRun(ActiveReverieRunManager->RunSeed);
+	}
 }
 
 void AMelodiaRhythmGameModeBase::EnsureGameplayLoopTestDirector()

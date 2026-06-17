@@ -93,7 +93,7 @@ public:
 	TArray<TObjectPtr<AMelodiaPickableFlower>> Flowers;
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|TestLoop")
-	bool BuildLayout();
+	bool BuildLayout(bool bForceRebuild = false);
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|TestLoop")
 	void ApplyToGameMode(AMelodiaRhythmGameModeBase* GameMode) const;
