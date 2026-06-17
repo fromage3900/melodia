@@ -19,8 +19,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
 	static bool EnsureDefaultContentAssets();
 
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
+	static bool EnsureTestLoopBlueprintAssets();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
+	static bool EnsureTestLoopLevelAsset();
+
 private:
 	static bool EnsureContentFolder(const FString& FolderPath);
 	static bool SaveNewDataAsset(UObject* Asset, const FString& ObjectPath);
+	static bool EnsureChildBlueprint(const FString& AssetPath, UClass* ParentClass);
 };
 #endif

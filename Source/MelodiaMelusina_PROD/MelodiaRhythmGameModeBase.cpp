@@ -19,6 +19,7 @@
 #include "MelodiaCosmeticsComponent.h"
 #include "MelodiaEncounterTrigger.h"
 #include "MelodiaExplorationInputComponent.h"
+#include "MelodiaGameplayLoopTestDirector.h"
 #include "MelodiaInventoryComponent.h"
 #include "MelodiaJRPGBridgeLibrary.h"
 #include "MelodiaJRPGPresenter.h"
@@ -75,6 +76,14 @@ void AMelodiaRhythmGameModeBase::InitGame(const FString& MapName, const FString&
 	{
 		bMinimalDemoMode = false;
 	}
+
+	if (FParse::Param(*Options, TEXT("GameplayLoopTest"))
+		|| MapName.Contains(TEXT("GameplayLoopTest"), ESearchCase::IgnoreCase))
+	{
+		bGameplayLoopTestMap = true;
+		bPreferLevelPlacedLoopActors = true;
+		bUsePCGPlacement = false;
+	}
 }
 
 void AMelodiaRhythmGameModeBase::RestartPlayer(AController* NewPlayer)
@@ -110,6 +119,11 @@ void AMelodiaRhythmGameModeBase::BeginPlay()
 {
 	Super::BeginPlay();
 	SetLoopPhase(EMelodiaLoopPhase::Bootstrapping);
+
+	if (bGameplayLoopTestMap)
+	{
+		EnsureGameplayLoopTestDirector();
+	}
 
 	if (bMinimalDemoMode)
 	{
@@ -168,8 +182,11 @@ void AMelodiaRhythmGameModeBase::BeginPlay()
 	EnsureProgressionNPCs();
 
 	EnsureEncounterTrigger();
-	EnsureReverieRunManager();
-	EnsurePCGGameplayPlacement();
+	if (!bGameplayLoopTestMap)
+	{
+		EnsureReverieRunManager();
+		EnsurePCGGameplayPlacement();
+	}
 	EnsureWorldInteractions();
 
 	if (ShouldRunLoopVerifier() && !FindExistingActorOfClass(AMelodiaLoopVerifier::StaticClass()))
@@ -506,7 +523,7 @@ void AMelodiaRhythmGameModeBase::SyncExplorationLocations()
 		ExplorationReturnLocation.Z = ResolveExplorationSpawnLocation().Z;
 	}
 
-	if (ActiveEncounterTrigger && !bPCGPlacementActive)
+	if (ActiveEncounterTrigger && !bPCGPlacementActive && !bPreferLevelPlacedLoopActors)
 	{
 		ActiveEncounterTrigger->SetActorLocation(EncounterTriggerLocation);
 	}
@@ -869,7 +886,7 @@ void AMelodiaRhythmGameModeBase::EnsureCompanionActor()
 void AMelodiaRhythmGameModeBase::EnsureProgressionNPCs()
 {
 	UWorld* World = GetWorld();
-	if (!World || ActiveProgressionNPCs.Num() >= 3)
+	if (!World)
 	{
 		return;
 	}
@@ -878,6 +895,12 @@ void AMelodiaRhythmGameModeBase::EnsureProgressionNPCs()
 	{
 		ActiveProgressionNPCs.AddUnique(*It);
 	}
+
+	if (bGameplayLoopTestMap)
+	{
+		return;
+	}
+
 	if (ActiveProgressionNPCs.Num() >= 3)
 	{
 		return;
@@ -957,9 +980,26 @@ void AMelodiaRhythmGameModeBase::EnsureEncounterTrigger()
 
 	if (!ActiveEncounterTrigger)
 	{
-		if (AMelodiaEncounterTrigger* ExistingTrigger = Cast<AMelodiaEncounterTrigger>(FindExistingActorOfClass(AMelodiaEncounterTrigger::StaticClass())))
+		if (ActiveTestLoopDirector && ActiveTestLoopDirector->EncounterGate)
 		{
-			ActiveEncounterTrigger = ExistingTrigger;
+			ActiveEncounterTrigger = ActiveTestLoopDirector->EncounterGate;
+		}
+	}
+
+	if (!ActiveEncounterTrigger)
+	{
+		UWorld* World = GetWorld();
+		if (World)
+		{
+			for (TActorIterator<AMelodiaEncounterTrigger> It(World); It; ++It)
+			{
+				if (It->ActorHasTag(TEXT("Melodia.TestLoop.Enemy")))
+				{
+					continue;
+				}
+				ActiveEncounterTrigger = *It;
+				break;
+			}
 		}
 	}
 
@@ -982,7 +1022,7 @@ void AMelodiaRhythmGameModeBase::EnsureEncounterTrigger()
 
 	if (ActiveEncounterTrigger)
 	{
-		if (!bPCGPlacementActive)
+		if (!bPCGPlacementActive && !bPreferLevelPlacedLoopActors)
 		{
 			ActiveEncounterTrigger->SetActorLocation(EncounterTriggerLocation);
 		}
@@ -1112,7 +1152,7 @@ void AMelodiaRhythmGameModeBase::EnsureWorldInteractions()
 		ActivePortal->SetActorLocation(PortalLocation);
 	}
 
-	if (ActivePortal)
+	if (ActivePortal && !bPreferLevelPlacedLoopActors)
 	{
 		if (bPCGPlacementActive)
 		{
@@ -1128,6 +1168,11 @@ void AMelodiaRhythmGameModeBase::EnsureWorldInteractions()
 
 void AMelodiaRhythmGameModeBase::EnsurePortfolioFlowers()
 {
+	if (bGameplayLoopTestMap)
+	{
+		return;
+	}
+
 	UWorld* World = GetWorld();
 	if (!World)
 	{
@@ -1427,6 +1472,56 @@ void AMelodiaRhythmGameModeBase::EnsureBattleMusicClock()
 	{
 		ActiveMusicManager->StartBattleMusic(nullptr, DefaultBattleBPM);
 	}
+}
+
+void AMelodiaRhythmGameModeBase::ConfigureGameplayLoopTest(const FVector& PlayerSpawnLocation, const FVector& GateLocation)
+{
+	bGameplayLoopTestMap = true;
+	bPreferLevelPlacedLoopActors = true;
+	bUsePCGPlacement = false;
+	ExplorationReturnLocation = PlayerSpawnLocation;
+	EncounterTriggerLocation = GateLocation;
+}
+
+void AMelodiaRhythmGameModeBase::EnsureGameplayLoopTestDirector()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (TActorIterator<AMelodiaGameplayLoopTestDirector> It(World); It; ++It)
+	{
+		ActiveTestLoopDirector = *It;
+		break;
+	}
+
+	if (!ActiveTestLoopDirector)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ActiveTestLoopDirector = World->SpawnActor<AMelodiaGameplayLoopTestDirector>(
+			AMelodiaGameplayLoopTestDirector::StaticClass(),
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			Params);
+	}
+
+	if (!ActiveTestLoopDirector)
+	{
+		return;
+	}
+
+	if (!ActiveTestLoopDirector->bLayoutBuilt)
+	{
+		ActiveTestLoopDirector->BuildLayout();
+	}
+
+	ActiveTestLoopDirector->ApplyToGameMode(this);
+	UE_LOG(LogTemp, Log, TEXT("Melodia gameplay loop test director active (spawn=%s gate=%s)."),
+		*ExplorationReturnLocation.ToString(),
+		*EncounterTriggerLocation.ToString());
 }
 
 void AMelodiaRhythmGameModeBase::SanitizeWorldForMinimalDemo()

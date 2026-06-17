@@ -17,7 +17,7 @@ public class MelodiaMelusina_PROD : ModuleRules
 
 		if (Target.bBuildEditor)
 		{
-			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "EditorScriptingUtilities", "AssetTools", "EditorSubsystem" });
+			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "EditorScriptingUtilities", "AssetTools", "EditorSubsystem", "Kismet" });
 		}
 		
 		// Uncomment if you are using online features

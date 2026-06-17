@@ -33,6 +33,7 @@ class AMelodiaNPCBase;
 class AMelodiaReverieRunManager;
 class AMelodiaRestPoint;
 class AMelodiaPortal;
+class AMelodiaGameplayLoopTestDirector;
 class AMelodiaPCGEncounterSpawner;
 class AMelodiaPCGWalkableIndex;
 class UPCGComponent;
@@ -111,6 +112,14 @@ public:
 	/** Bare-minimum slice: PlayerStart explore, one song gate, one battle. Skips PCG/quest/verifier extras. Off by default — enable only for smoke tests (?MinimalDemo on URL). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	bool bMinimalDemoMode = false;
+
+	/** Dedicated gameplay-loop test map: flat arena, in-level gate/NPC/bed/portal/flowers/enemy. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
+	bool bGameplayLoopTestMap = false;
+
+	/** When true, do not relocate level-placed encounter/rest/portal actors (test director owns layout). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
+	bool bPreferLevelPlacedLoopActors = false;
 
 	/** Legacy rhythm test manager spawns beat-print debug actor — off by default (duplicates Melodia battle clock). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
@@ -197,6 +206,9 @@ public:
 	TObjectPtr<AMelodiaEncounterTrigger> ActiveEncounterTrigger;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
+	TObjectPtr<AMelodiaGameplayLoopTestDirector> ActiveTestLoopDirector;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
 	TObjectPtr<AMelodiaReverieRunManager> ActiveReverieRunManager;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
@@ -225,6 +237,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Melodia|Presentation")
 	UMelodiaRhythmHUDWidget* GetRhythmHUDWidget() const { return ActiveRhythmHUDWidget; }
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Loop")
+	void ConfigureGameplayLoopTest(const FVector& PlayerSpawnLocation, const FVector& GateLocation);
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Presentation")
 	UMelodiaRhythmHUDWidget* EnsureActiveRhythmHUD();
@@ -299,6 +314,7 @@ protected:
 	void AutoConfirmVictoryIfPending();
 	void PrepareExplorationPresentation();
 	void SanitizeWorldForMinimalDemo();
+	void EnsureGameplayLoopTestDirector();
 	void EnsureBattleMusicClock();
 	void ApplyMelusinaPresentation(APawn* ExplorationPawn);
 };
