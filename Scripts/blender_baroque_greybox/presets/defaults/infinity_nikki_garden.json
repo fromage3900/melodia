@@ -1,0 +1,41 @@
+{
+  "name": "Infinity Nikki Garden",
+  "description": "Whimsical garden scene with balustrades, columns, and ornate details",
+  "mode": "VALID",
+  "generators": {
+    "balustrade": {
+      "length": 800,
+      "height": 100,
+      "baluster_count": 20,
+      "baluster_profile": "baroque_turned",
+      "rail_height": 10,
+      "rail_depth": 15,
+      "newel_enabled": true,
+      "newel_width": 25,
+      "segments": 16
+    },
+    "column_corinthian": {
+      "shaft_height": 600,
+      "radius_bottom": 30,
+      "radius_top": 25,
+      "fluting_count": 20,
+      "fluting_depth": 3.0,
+      "base_enabled": true,
+      "capital_enabled": true,
+      "segments": 24
+    },
+    "ornament_rose_window": {
+      "radius": 200,
+      "petals": 8,
+      "depth": 15,
+      "inner_radius": 40,
+      "segments": 24
+    },
+    "vault_dome": {
+      "radius": 400,
+      "height": 300,
+      "thickness": 15,
+      "segments": 32
+    }
+  }
+}

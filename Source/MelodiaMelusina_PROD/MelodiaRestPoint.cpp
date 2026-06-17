@@ -8,6 +8,7 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "MelodiaSaveGame.h"
+#include "MelodiaMechanicProgressionSubsystem.h"
 #include "MelodiaRhythmHUDWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UObject/UObjectIterator.h"
@@ -78,6 +79,17 @@ bool AMelodiaRestPoint::ActivateRest(APawn* RestingPawn)
 	SaveData->bHasRestedAtMelusinasBed = true;
 	SaveData->LastSaveReason = TEXT("Rested at Melusina's Bed");
 	LastSavedDay = SaveData->DayIndex;
+
+	if (UWorld* World = GetWorld())
+	{
+		if (UGameInstance* GI = World->GetGameInstance())
+		{
+			if (UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+			{
+				Progression->WriteToSave(SaveData);
+			}
+		}
+	}
 
 	bLastSaveSucceeded = UGameplayStatics::SaveGameToSlot(SaveData, SaveSlotName, UserIndex);
 	PublishRestFeedback(GetWorld(), bLastSaveSucceeded

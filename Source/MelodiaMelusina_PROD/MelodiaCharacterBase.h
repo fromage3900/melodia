@@ -6,9 +6,14 @@
 #include "GameFramework/Character.h"
 #include "MelodiaCharacterBase.generated.h"
 
+class UCameraComponent;
 class UMelodiaCosmeticsComponent;
 class UMelodiaExplorationInputComponent;
+class UMelodiaGlideComponent;
 class UMelodiaInventoryComponent;
+class USkeletalMesh;
+class USpringArmComponent;
+class UInputComponent;
 
 /**
  * Authoritative Melusina exploration character.
@@ -32,6 +37,15 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Melodia|Character")
 	TObjectPtr<UMelodiaInventoryComponent> InventoryComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Melodia|Character")
+	TObjectPtr<UMelodiaGlideComponent> GlideComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Melodia|Character|Camera")
+	TObjectPtr<USpringArmComponent> CameraBoom;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Melodia|Character|Camera")
+	TObjectPtr<UCameraComponent> FollowCamera;
+
 	/** Apply palette/sparkle cosmetics on spawn and after battle return. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|Character")
 	bool bAutoApplyCosmetics = true;
@@ -48,8 +62,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|Character")
 	FName DefaultCosmeticPresetId = TEXT("MelusinaDefault");
 
+	/** Optional fallback mesh when none is assigned on the BP (defaults to SK_Melusina_Prototype). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|Character|Placeholder")
+	TSoftObjectPtr<USkeletalMesh> PlaceholderSkeletalMesh = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(TEXT("/Game/Melodia/Characters/Melusina/SK_Melusina_Prototype.SK_Melusina_Prototype")));
+
+	/** Load PlaceholderSkeletalMesh if the character mesh slot is empty at runtime. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|Character|Placeholder")
+	bool bUsePlaceholderMeshWhenEmpty = true;
+
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Character")
 	void InitializeExplorationSystems();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Character")
+	void EnsureDisplayMesh();
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Character")
 	void ApplyMelusinaPresentation();
@@ -60,6 +85,15 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void PossessedBy(AController* NewController) override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	virtual void Jump() override;
+	virtual void StopJumping() override;
 
 	void ConfigureExplorationMovement();
+	void ConfigureExplorationCamera();
+
+	void MoveForward(float Value);
+	void MoveRight(float Value);
+	void Turn(float Value);
+	void LookUp(float Value);
 };

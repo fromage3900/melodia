@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "MelodiaSpellTypes.h"
 #include "MelodiaCoreRulesLibrary.generated.h"
 
 UENUM(BlueprintType)
@@ -100,6 +101,9 @@ struct FMelodiaGeneratedSpell
 	EMelodiaInstrument Instrument = EMelodiaInstrument::MusicBox;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Songcraft")
+	EMelodiaSpellElement SpellElement = EMelodiaSpellElement::Forte;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Songcraft")
 	int32 SPCost = 1;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Songcraft")
@@ -159,4 +163,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Melodia|Songcraft")
 	static float GetInstrumentPowerScalar(EMelodiaInstrument Instrument);
+
+	UFUNCTION(BlueprintPure, Category="Melodia|Songcraft")
+	static EMelodiaSpellElement DeriveSpellElementFromSong(const TArray<int32>& NotePitches, EMelodiaInstrument Instrument);
+
+	UFUNCTION(BlueprintPure, Category="Melodia|Songcraft")
+	static float CalculateElementalDamageMultiplier(EMelodiaSpellElement AttackElement, EMelodiaSpellElement DefenseElement, bool bHasMatchingKey);
+
+	UFUNCTION(BlueprintPure, Category="Melodia|Songcraft")
+	static FText GetElementDisplayName(EMelodiaSpellElement Element);
 };

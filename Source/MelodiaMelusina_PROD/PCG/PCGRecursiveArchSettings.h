@@ -19,7 +19,7 @@ struct FPCGContext;
 // ---------------------------------------------------------------------------
 // Settings — artist-editable parameters for the recursive arch generator.
 // ---------------------------------------------------------------------------
-UCLASS(BlueprintType)
+UCLASS(BlueprintType, EditInlineNew, meta = (DisplayName = "Recursive Arch", Category = "Custom Elements|Architecture"))
 class MELODIAMELUSINA_PROD_API UPCGRecursiveArchSettings : public UPCGSettings
 {
 	GENERATED_BODY()

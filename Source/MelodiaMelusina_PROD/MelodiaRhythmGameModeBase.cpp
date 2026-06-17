@@ -12,17 +12,25 @@
 #include "GameFramework/Controller.h"
 #include "Kismet/GameplayStatics.h"
 #include "MelodiaBattleInputComponent.h"
+#include "MelodiaBattleLoopLibrary.h"
+#include "MelodiaBattleSession.h"
 #include "MelodiaCharacterBase.h"
+#include "MelodiaCompanionActor.h"
 #include "MelodiaCosmeticsComponent.h"
 #include "MelodiaEncounterTrigger.h"
 #include "MelodiaExplorationInputComponent.h"
 #include "MelodiaInventoryComponent.h"
+#include "MelodiaJRPGBridgeLibrary.h"
 #include "MelodiaLoopVerifier.h"
 #include "MelodiaMusicManager.h"
+#include "MelodiaNPCBase.h"
 #include "MelodiaQuestManagerBase.h"
 #include "MelodiaReverieRunManager.h"
 #include "MelodiaRestPoint.h"
+#include "MelodiaPickableFlower.h"
 #include "MelodiaPortal.h"
+#include "MelodiaSaveGame.h"
+#include "MelodiaMechanicProgressionSubsystem.h"
 #include "MelodiaRhythmHUDWidget.h"
 #include "MelodiaPCGEncounterSpawner.h"
 #include "MelodiaPCGWalkableIndex.h"
@@ -35,6 +43,8 @@
 AMelodiaRhythmGameModeBase::AMelodiaRhythmGameModeBase()
 {
 	DefaultPawnClass = nullptr;
+	bMinimalDemoMode = false;
+	bUsePCGPlacement = false;
 }
 
 void AMelodiaRhythmGameModeBase::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
@@ -54,6 +64,15 @@ void AMelodiaRhythmGameModeBase::InitGame(const FString& MapName, const FString&
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Melodia loop bootstrap could not resolve exploration pawn class: %s"), *ExplorationPawnClassPath.ToString());
+	}
+
+	if (FParse::Param(*Options, TEXT("MinimalDemo")))
+	{
+		bMinimalDemoMode = true;
+	}
+	else if (FParse::Param(*Options, TEXT("FullGame")))
+	{
+		bMinimalDemoMode = false;
 	}
 }
 
@@ -80,7 +99,6 @@ void AMelodiaRhythmGameModeBase::PostLogin(APlayerController* NewPlayer)
 	Super::PostLogin(NewPlayer);
 
 	EnsureRhythmHUDWidget();
-	EnsureBattleInputBridge();
 	if (CurrentLoopPhase == EMelodiaLoopPhase::ExplorationReady)
 	{
 		RestoreExplorationControl();
@@ -91,6 +109,26 @@ void AMelodiaRhythmGameModeBase::BeginPlay()
 {
 	Super::BeginPlay();
 	SetLoopPhase(EMelodiaLoopPhase::Bootstrapping);
+
+	if (bMinimalDemoMode)
+	{
+		SanitizeWorldForMinimalDemo();
+		if (UClass* QuartzMusicClass = ResolveClass(QuartzMusicManagerClassPath))
+		{
+			ActiveMusicManager = Cast<AMelodiaMusicManager>(FindExistingActorOfClass(QuartzMusicClass));
+		}
+		EnsureRhythmHUDWidget();
+		EnsureQuestManager();
+		EnsureCompanionActor();
+		EnsureProgressionNPCs();
+		EnsureEncounterTrigger();
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateUObject(this, &AMelodiaRhythmGameModeBase::FinishLoopBootstrap));
+		}
+		UE_LOG(LogTemp, Warning, TEXT("MELODIA_MIN_DEMO: explore with WASD, walk to the glowing sphere, Space/1 to attack in battle."));
+		return;
+	}
 
 	UClass* QuartzMusicClass = ResolveClass(QuartzMusicManagerClassPath);
 	if (QuartzMusicClass)
@@ -104,8 +142,7 @@ void AMelodiaRhythmGameModeBase::BeginPlay()
 		ActiveMusicManager = Cast<AMelodiaMusicManager>(ExistingMusicActor);
 		if (ActiveMusicManager)
 		{
-			ActiveMusicManager->StartBattleMusic(nullptr, DefaultBattleBPM);
-			UE_LOG(LogTemp, Log, TEXT("Melodia loop bootstrap started Quartz rhythm clock at %.2f BPM."), DefaultBattleBPM);
+			UE_LOG(LogTemp, Log, TEXT("Melodia loop bootstrap found Quartz music manager (battle music deferred until encounter)."));
 		}
 	}
 
@@ -121,29 +158,15 @@ void AMelodiaRhythmGameModeBase::BeginPlay()
 
 	if (UClass* RhythmTestManagerClass = ResolveClass(RhythmTestManagerClassPath))
 	{
-		if (!FindExistingActorOfClass(RhythmTestManagerClass))
+		if (bEnableLegacyRhythmTestManager && !FindExistingActorOfClass(RhythmTestManagerClass))
 		{
 			SpawnLoopActor(RhythmTestManagerClass, FVector(-10700.0f, -5040.0f, -2150.0f), FRotator::ZeroRotator);
 		}
 	}
 
-	EnsureBattleInputBridge();
-
-	if (UClass* QuestManagerClass = ResolveClass(QuestManagerClassPath))
-	{
-		if (!FindExistingActorOfClass(QuestManagerClass))
-		{
-			SpawnLoopActor(QuestManagerClass, FVector(-10570.0f, -5000.0f, -2140.0f), FRotator::ZeroRotator);
-		}
-	}
-	else
-	{
-		if (!FindExistingActorOfClass(AMelodiaQuestManagerBase::StaticClass()))
-		{
-			GetWorld()->SpawnActor<AMelodiaQuestManagerBase>(AMelodiaQuestManagerBase::StaticClass(), FVector(-10570.0f, -5000.0f, -2140.0f), FRotator::ZeroRotator);
-			UE_LOG(LogTemp, Warning, TEXT("Melodia loop bootstrap fell back to native AMelodiaQuestManagerBase."));
-		}
-	}
+	EnsureQuestManager();
+	EnsureCompanionActor();
+	EnsureProgressionNPCs();
 
 	EnsureEncounterTrigger();
 	EnsureReverieRunManager();
@@ -172,6 +195,13 @@ void AMelodiaRhythmGameModeBase::BeginPlay()
 	}
 }
 
+void AMelodiaRhythmGameModeBase::NotifyBattleSessionBegan(AActor* BattleController)
+{
+	ActiveBattleController = BattleController;
+	EnsureBattleInputBridge();
+	PrepareMelodiaBattleView();
+}
+
 void AMelodiaRhythmGameModeBase::SetLoopPhase(const EMelodiaLoopPhase NewPhase)
 {
 	CurrentLoopPhase = NewPhase;
@@ -181,8 +211,14 @@ void AMelodiaRhythmGameModeBase::SetLoopPhase(const EMelodiaLoopPhase NewPhase)
 	{
 	case EMelodiaLoopPhase::Battle:
 		++BattlePhaseEntryCount;
+		EnsureBattleMusicClock();
 		EnsureBattleInputBridge();
+		PrepareMelodiaBattleView();
 		EnsureRhythmHUDWidget();
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(GetWorld()))
+		{
+			Widget->bDrawExplorationHUD = false;
+		}
 		break;
 	case EMelodiaLoopPhase::VictoryReward:
 		++VictoryRewardPhaseCount;
@@ -190,12 +226,28 @@ void AMelodiaRhythmGameModeBase::SetLoopPhase(const EMelodiaLoopPhase NewPhase)
 		{
 			if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 			{
-				Widget->ShowActionPrompt(TEXT("Victory! Space/1 to claim reward"));
+				Widget->bDrawExplorationHUD = false;
+				Widget->ShowActionPrompt(TEXT("Victory — Space to continue now, or wait"));
 			}
+			World->GetTimerManager().SetTimer(
+				VictoryAutoExitHandle,
+				this,
+				&AMelodiaRhythmGameModeBase::AutoConfirmVictoryIfPending,
+				1.25f,
+				false);
 		}
 		break;
 	case EMelodiaLoopPhase::ExplorationReady:
 		++ExplorationReadyPhaseCount;
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(VictoryAutoExitHandle);
+		}
+		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(GetWorld()))
+		{
+			Widget->bDrawExplorationHUD = true;
+		}
+		PrepareExplorationPresentation();
 		RestoreExplorationControl();
 		if (ActiveEncounterTrigger)
 		{
@@ -287,6 +339,19 @@ FVector AMelodiaRhythmGameModeBase::ResolveExplorationSpawnLocation() const
 		return ExplorationReturnLocation;
 	}
 
+	if (bMinimalDemoMode)
+	{
+		for (TActorIterator<APlayerStart> It(World); It; ++It)
+		{
+			const FVector StartLocation = It->GetActorLocation();
+			if (!StartLocation.IsNearlyZero(100.0f))
+			{
+				return StartLocation;
+			}
+		}
+		return ExplorationReturnLocation;
+	}
+
 	const FVector PCGCenter = FindPCGWorldCenter();
 	if (bPCGPlacementActive && ActiveWalkableIndex && ActiveWalkableIndex->GetCachedPointCount() > 0)
 	{
@@ -351,6 +416,11 @@ FVector AMelodiaRhythmGameModeBase::ResolveEncounterTriggerLocation() const
 		return ActiveEncounterTrigger->GetActorLocation();
 	}
 
+	if (bMinimalDemoMode || !bUsePCGPlacement)
+	{
+		return ExplorationReturnLocation + FVector(EncounterTriggerForwardOffset, 0.0f, 0.0f);
+	}
+
 	if (bPCGPlacementActive && ActiveWalkableIndex)
 	{
 		FVector WalkPos = FVector::ZeroVector;
@@ -369,6 +439,21 @@ void AMelodiaRhythmGameModeBase::SyncExplorationLocations()
 	ExplorationReturnLocation = ResolveExplorationSpawnLocation();
 	EncounterTriggerLocation = ResolveEncounterTriggerLocation();
 
+	constexpr float MinSpawnGateSeparation = 350.0f;
+	const float SpawnGateDistance2D = FVector::Dist2D(ExplorationReturnLocation, EncounterTriggerLocation);
+	if (SpawnGateDistance2D < MinSpawnGateSeparation)
+	{
+		FVector AwayFromGate = ExplorationReturnLocation - EncounterTriggerLocation;
+		AwayFromGate.Z = 0.0f;
+		if (AwayFromGate.IsNearlyZero(10.0f))
+		{
+			AwayFromGate = FVector(-1.0f, 0.0f, 0.0f);
+		}
+		AwayFromGate.Normalize();
+		ExplorationReturnLocation = EncounterTriggerLocation + AwayFromGate * MinSpawnGateSeparation;
+		ExplorationReturnLocation.Z = ResolveExplorationSpawnLocation().Z;
+	}
+
 	if (ActiveEncounterTrigger && !bPCGPlacementActive)
 	{
 		ActiveEncounterTrigger->SetActorLocation(EncounterTriggerLocation);
@@ -380,8 +465,10 @@ void AMelodiaRhythmGameModeBase::FinishLoopBootstrap()
 	EnsurePCGGameplayPlacement();
 	SyncExplorationLocations();
 	EnsureRhythmHUDWidget();
-	EnsureBattleInputBridge();
+	EnsureCompanionActor();
+	EnsureProgressionNPCs();
 	EnsureWorldInteractions();
+	EnsurePortfolioFlowers();
 	SetLoopPhase(EMelodiaLoopPhase::ExplorationReady);
 
 	if (AMelodiaQuestManagerBase* QuestManager = Cast<AMelodiaQuestManagerBase>(FindExistingActorOfClass(ResolveClass(QuestManagerClassPath))))
@@ -391,6 +478,20 @@ void AMelodiaRhythmGameModeBase::FinishLoopBootstrap()
 	else if (AMelodiaQuestManagerBase* NativeQuestManager = Cast<AMelodiaQuestManagerBase>(FindExistingActorOfClass(AMelodiaQuestManagerBase::StaticClass())))
 	{
 		NativeQuestManager->RegisterStarterQuests(EncounterTriggerLocation);
+	}
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+		{
+			if (UMelodiaSaveGame* SaveData = Cast<UMelodiaSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("MelodiaSlot"), 0)))
+			{
+				Progression->LoadFromSave(SaveData);
+			}
+			Progression->NotifyQuestSystemOfProgress(GetWorld());
+			Progression->ApplyUnlockedPresetsToReverieRunManager(ActiveReverieRunManager);
+			Progression->SyncHUD(GetWorld());
+		}
 	}
 
 	if (!bExplorationControlReady)
@@ -492,6 +593,9 @@ void AMelodiaRhythmGameModeBase::RestoreExplorationControl()
 	{
 		PlayerController->Possess(ExplorationPawn);
 		PlayerController->SetViewTarget(ExplorationPawn);
+		PlayerController->bShowMouseCursor = false;
+		PlayerController->SetIgnoreLookInput(false);
+		PlayerController->SetIgnoreMoveInput(false);
 		bExplorationControlReady = PlayerController->GetPawn() == ExplorationPawn;
 		if (bExplorationControlReady)
 		{
@@ -615,12 +719,157 @@ void AMelodiaRhythmGameModeBase::EnsureRhythmHUDWidget()
 	{
 		ActiveRhythmHUDWidget->AddToViewport(40);
 		ActiveRhythmHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-		ActiveRhythmHUDWidget->bDrawExplorationHUD = true;
+		ActiveRhythmHUDWidget->bDrawExplorationHUD = CurrentLoopPhase != EMelodiaLoopPhase::Battle;
 		ActiveRhythmHUDWidget->ApplyCuteCombatTheme();
 		ActiveRhythmHUDWidget->TriggerSparkleBurst();
 		bRhythmHUDWidgetInViewport = true;
 		UE_LOG(LogTemp, Log, TEXT("Melodia loop added native rhythm HUD widget to viewport."));
 	}
+}
+
+void AMelodiaRhythmGameModeBase::EnsureQuestManager()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (FindExistingActorOfClass(ResolveClass(QuestManagerClassPath))
+		|| FindExistingActorOfClass(AMelodiaQuestManagerBase::StaticClass()))
+	{
+		return;
+	}
+
+	if (UClass* QuestManagerClass = ResolveClass(QuestManagerClassPath))
+	{
+		SpawnLoopActor(QuestManagerClass, FVector(-10570.0f, -5000.0f, -2140.0f), FRotator::ZeroRotator);
+		return;
+	}
+
+	World->SpawnActor<AMelodiaQuestManagerBase>(
+		AMelodiaQuestManagerBase::StaticClass(),
+		FVector(-10570.0f, -5000.0f, -2140.0f),
+		FRotator::ZeroRotator);
+	UE_LOG(LogTemp, Warning, TEXT("Melodia loop bootstrap fell back to native AMelodiaQuestManagerBase."));
+}
+
+void AMelodiaRhythmGameModeBase::EnsureCompanionActor()
+{
+	if (ActiveCompanion)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (TActorIterator<AMelodiaCompanionActor> It(World); It; ++It)
+	{
+		ActiveCompanion = *It;
+		return;
+	}
+
+	UClass* CompanionClass = ResolveClass(CompanionClassPath);
+	if (!CompanionClass)
+	{
+		CompanionClass = AMelodiaCompanionActor::StaticClass();
+	}
+
+	SyncExplorationLocations();
+	const FVector SpawnLocation = ExplorationReturnLocation + FVector(-120.0f, 140.0f, 80.0f);
+	ActiveCompanion = Cast<AMelodiaCompanionActor>(SpawnLoopActor(CompanionClass, SpawnLocation, FRotator::ZeroRotator));
+	if (!ActiveCompanion)
+	{
+		ActiveCompanion = World->SpawnActor<AMelodiaCompanionActor>(
+			AMelodiaCompanionActor::StaticClass(), SpawnLocation, FRotator::ZeroRotator);
+	}
+
+	if (ActiveCompanion)
+	{
+		if (UGameInstance* GI = World->GetGameInstance())
+		{
+			if (const UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+			{
+				ActiveCompanion->SetCompanionUnlocked(Progression->State.bCompanionUnlocked);
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("Melodia loop spawned companion at %s."), *SpawnLocation.ToString());
+	}
+}
+
+void AMelodiaRhythmGameModeBase::EnsureProgressionNPCs()
+{
+	UWorld* World = GetWorld();
+	if (!World || ActiveProgressionNPCs.Num() >= 3)
+	{
+		return;
+	}
+
+	for (TActorIterator<AMelodiaNPCBase> It(World); It; ++It)
+	{
+		ActiveProgressionNPCs.AddUnique(*It);
+	}
+	if (ActiveProgressionNPCs.Num() >= 3)
+	{
+		return;
+	}
+
+	UClass* NPCClass = ResolveClass(ProgressionNPCClassPath);
+	if (!NPCClass)
+	{
+		NPCClass = AMelodiaNPCBase::StaticClass();
+	}
+
+	SyncExplorationLocations();
+	struct FNPROw
+	{
+		FVector Offset;
+		FName QuestId;
+		FString Name;
+		FString Dialogue;
+		int32 ReqLevel;
+	};
+
+	const FNPROw Rows[3] = {
+		{ FVector(200.0f, -220.0f, 0.0f), TEXT("Tutor_TierII"), TEXT("Moon Tutor"), TEXT("Tier II skills bloom at Lv6. Keep composing!"), 1 },
+		{ FVector(-240.0f, 200.0f, 0.0f), TEXT("Tutor_TierIV"), TEXT("Aurora Tutor"), TEXT("Harmonic keys shine brightest at Lv16."), 11 },
+		{ FVector(300.0f, 260.0f, 0.0f), TEXT("Tutor_TierVI"), TEXT("Celestial Tutor"), TEXT("The Maestro Sanctum awaits at Lv26."), 21 },
+	};
+
+	for (const FNPROw& Row : Rows)
+	{
+		if (ActiveProgressionNPCs.Num() >= 3)
+		{
+			break;
+		}
+
+		AMelodiaNPCBase* NPC = Cast<AMelodiaNPCBase>(SpawnLoopActor(
+			NPCClass,
+			ExplorationReturnLocation + Row.Offset + FVector(0.0f, 0.0f, 40.0f),
+			FRotator(0.0f, 180.0f, 0.0f)));
+		if (!NPC)
+		{
+			NPC = World->SpawnActor<AMelodiaNPCBase>(
+				AMelodiaNPCBase::StaticClass(),
+				ExplorationReturnLocation + Row.Offset + FVector(0.0f, 0.0f, 40.0f),
+				FRotator(0.0f, 180.0f, 0.0f));
+		}
+		if (NPC)
+		{
+			NPC->QuestId = Row.QuestId;
+			NPC->DisplayName = Row.Name;
+			NPC->DialogueLine = Row.Dialogue;
+			NPC->RequiredMechanicLevel = Row.ReqLevel;
+			NPC->InteractionPrompt = TEXT("F: Talk to tutor");
+			ActiveProgressionNPCs.Add(NPC);
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("Melodia loop spawned %d progression tutor NPCs."), ActiveProgressionNPCs.Num());
 }
 
 void AMelodiaRhythmGameModeBase::EnsureEncounterTrigger()
@@ -810,6 +1059,58 @@ void AMelodiaRhythmGameModeBase::EnsureWorldInteractions()
 		}
 		ActivePortal->bUseTargetWorldLocation = true;
 	}
+}
+
+void AMelodiaRhythmGameModeBase::EnsurePortfolioFlowers()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	int32 ExistingCount = 0;
+	for (TActorIterator<AMelodiaPickableFlower> It(World); It; ++It)
+	{
+		++ExistingCount;
+	}
+	if (ExistingCount >= 3)
+	{
+		return;
+	}
+
+	SyncExplorationLocations();
+	const FVector Origin = ExplorationReturnLocation;
+	const FLinearColor Tints[] = {
+		FLinearColor(0.98f, 0.52f, 0.86f, 1.0f),
+		FLinearColor(0.72f, 0.62f, 0.98f, 1.0f),
+		FLinearColor(0.98f, 0.82f, 0.42f, 1.0f),
+		FLinearColor(0.52f, 0.92f, 0.78f, 1.0f),
+		FLinearColor(0.98f, 0.68f, 0.52f, 1.0f),
+	};
+
+	const int32 SpawnCount = 6;
+	for (int32 Index = 0; Index < SpawnCount; ++Index)
+	{
+		const float Angle = static_cast<float>(Index) * (360.0f / static_cast<float>(SpawnCount));
+		const float Radius = 280.0f + static_cast<float>(Index) * 40.0f;
+		const FVector Offset(FMath::Cos(FMath::DegreesToRadians(Angle)) * Radius, FMath::Sin(FMath::DegreesToRadians(Angle)) * Radius, 0.0f);
+
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		AMelodiaPickableFlower* Flower = World->SpawnActor<AMelodiaPickableFlower>(
+			AMelodiaPickableFlower::StaticClass(),
+			Origin + Offset,
+			FRotator(0.0f, Angle, 0.0f),
+			Params);
+		if (Flower)
+		{
+			Flower->BloomTint = Tints[Index % UE_ARRAY_COUNT(Tints)];
+			Flower->DisplayName = FString::Printf(TEXT("Reverie Blossom %d"), Index + 1);
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("Melodia portfolio: spawned pickable flowers around %s."), *Origin.ToString());
 }
 
 UPCGComponent* AMelodiaRhythmGameModeBase::FindPrimaryPCGComponent() const
@@ -1034,6 +1335,195 @@ void AMelodiaRhythmGameModeBase::ApplyPCGPlacedInteractables()
 		*EncounterTriggerLocation.ToString());
 }
 
+void AMelodiaRhythmGameModeBase::EnsureBattleMusicClock()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (!ActiveMusicManager)
+	{
+		UClass* MusicClass = ResolveClass(QuartzMusicManagerClassPath);
+		if (!MusicClass)
+		{
+			MusicClass = AMelodiaMusicManager::StaticClass();
+		}
+
+		ActiveMusicManager = Cast<AMelodiaMusicManager>(FindExistingActorOfClass(MusicClass));
+		if (!ActiveMusicManager)
+		{
+			ActiveMusicManager = Cast<AMelodiaMusicManager>(SpawnLoopActor(MusicClass, FVector::ZeroVector, FRotator::ZeroRotator));
+		}
+	}
+
+	if (ActiveMusicManager)
+	{
+		ActiveMusicManager->StartBattleMusic(nullptr, DefaultBattleBPM);
+	}
+}
+
+void AMelodiaRhythmGameModeBase::SanitizeWorldForMinimalDemo()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (TActorIterator<AMelodiaLoopVerifier> It(World); It; ++It)
+	{
+		It->Destroy();
+	}
+
+	TArray<AMelodiaEncounterTrigger*> ExistingTriggers;
+	for (TActorIterator<AMelodiaEncounterTrigger> It(World); It; ++It)
+	{
+		ExistingTriggers.Add(*It);
+	}
+	for (AMelodiaEncounterTrigger* Trigger : ExistingTriggers)
+	{
+		if (Trigger)
+		{
+			Trigger->Destroy();
+		}
+	}
+	ActiveEncounterTrigger = nullptr;
+
+	if (UClass* RhythmTestManagerClass = ResolveClass(RhythmTestManagerClassPath))
+	{
+		TArray<AActor*> RhythmManagers;
+		for (TActorIterator<AActor> It(World, RhythmTestManagerClass); It; ++It)
+		{
+			RhythmManagers.Add(*It);
+		}
+		for (AActor* Manager : RhythmManagers)
+		{
+			if (Manager)
+			{
+				Manager->Destroy();
+			}
+		}
+	}
+
+	if (UClass* BattleControllerClass = ResolveClass(BattleControllerClassPath))
+	{
+		for (TActorIterator<AActor> It(World, BattleControllerClass); It; ++It)
+		{
+			UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(*It);
+			It->SetActorHiddenInGame(true);
+			It->SetActorEnableCollision(false);
+		}
+	}
+}
+
+void AMelodiaRhythmGameModeBase::PrepareMelodiaBattleView()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(World, 0);
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	APawn* ExplorationPawn = Cast<APawn>(PlayerController->GetPawn());
+	if (!ExplorationPawn)
+	{
+		ExplorationPawn = ActiveExplorationPawn.Get();
+	}
+	if (!ExplorationPawn)
+	{
+		ExplorationPawn = Cast<APawn>(FindExistingActorOfClass(ResolveClass(ExplorationPawnClassPath)));
+	}
+	if (ExplorationPawn)
+	{
+		ActiveExplorationPawn = ExplorationPawn;
+		PlayerController->Possess(ExplorationPawn);
+		PlayerController->SetViewTarget(ExplorationPawn);
+	}
+
+	PlayerController->SetIgnoreMoveInput(true);
+	PlayerController->SetIgnoreLookInput(false);
+	PlayerController->bShowMouseCursor = false;
+
+	AActor* BattleController = ActiveBattleController.Get();
+	if (!BattleController)
+	{
+		BattleController = FindExistingActorOfClass(ResolveClass(BattleControllerClassPath));
+	}
+	if (BattleController && !bSuppressPhoenixBattleUI)
+	{
+		// Option B: leave Phoenix command UI visible for designer replacement.
+	}
+	else if (BattleController)
+	{
+		UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(BattleController);
+	}
+
+	if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
+	{
+		Widget->ShowActionPrompt(TEXT("1=Attack | 2=Skill (rhythm) | 4 or Esc=Flee"));
+	}
+}
+
+void AMelodiaRhythmGameModeBase::AutoConfirmVictoryIfPending()
+{
+	UWorld* World = GetWorld();
+	if (!World || CurrentLoopPhase != EMelodiaLoopPhase::VictoryReward)
+	{
+		return;
+	}
+
+	AActor* BattleController = ActiveBattleController.Get();
+	if (!BattleController)
+	{
+		BattleController = FindExistingActorOfClass(ResolveClass(BattleControllerClassPath));
+	}
+	if (BattleController && UMelodiaBattleLoopLibrary::HasRhythmVictoryResolved(BattleController))
+	{
+		if (UMelodiaBattleSession* Session = UMelodiaBattleSession::Get(this))
+		{
+			Session->ConfirmVictoryReward();
+			return;
+		}
+		UMelodiaBattleLoopLibrary::ConfirmRhythmVictoryReward(BattleController);
+	}
+}
+
+void AMelodiaRhythmGameModeBase::PrepareExplorationPresentation()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (UClass* BattleControllerClass = ResolveClass(BattleControllerClassPath))
+	{
+		for (TActorIterator<AActor> It(World, BattleControllerClass); It; ++It)
+		{
+			UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(*It);
+			It->SetActorHiddenInGame(true);
+			It->SetActorEnableCollision(false);
+		}
+	}
+
+	if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
+	{
+		Widget->bDrawExplorationHUD = true;
+		Widget->ClearBattleStatus();
+		Widget->SetNoteHighwayActive(false, TArray<FMelodiaHighwayNote>(), 0.0f, 2.5f);
+		Widget->SetBattlePhaseBanner(TEXT(""));
+		Widget->ShowActionPrompt(TEXT("Explore: walk to the song gate | WASD move | I=Inventory"));
+	}
+}
+
 void AMelodiaRhythmGameModeBase::EnsureBattleInputBridge()
 {
 	UWorld* World = GetWorld();
@@ -1060,6 +1550,9 @@ void AMelodiaRhythmGameModeBase::EnsureBattleInputBridge()
 		return;
 	}
 
+	BattleController->SetActorHiddenInGame(false);
+	BattleController->SetActorEnableCollision(true);
+
 	ActiveBattleController = BattleController;
 	UMelodiaBattleInputComponent* InputBridge = BattleController->FindComponentByClass<UMelodiaBattleInputComponent>();
 	if (!InputBridge)
@@ -1067,6 +1560,7 @@ void AMelodiaRhythmGameModeBase::EnsureBattleInputBridge()
 		InputBridge = NewObject<UMelodiaBattleInputComponent>(BattleController, UMelodiaBattleInputComponent::StaticClass(), TEXT("MelodiaBattleInput"));
 		if (InputBridge)
 		{
+			InputBridge->bAutoBindPlayerInput = false;
 			InputBridge->RegisterComponent();
 			BattleController->AddInstanceComponent(InputBridge);
 		}

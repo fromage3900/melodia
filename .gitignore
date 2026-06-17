@@ -33,3 +33,18 @@ Desktop.ini
 .dvignore
 
 # Keep these (do NOT ignore): Config/, Content/, Source/, *.uproject, .gitattributes, Docs/
+
+# Large local import staging (FBX/VRM binaries)
+Content/Import/**/*.fbx
+Content/Import/**/*.vrm
+build_log.txt
+
+# UI asset staging — keep flat PNGs/TTFs only, not nested git clones
+Content/Melodia/UI/Sprites/**/.git/
+Content/Melodia/UI/Sprites/_tmp_*/
+Content/Melodia/UI/Sprites/_test/
+Content/Melodia/UI/Sprites/SparkleUI/
+Content/Melodia/UI/Fonts/_extracted/
+
+# Python cache
+Scripts/**/__pycache__/

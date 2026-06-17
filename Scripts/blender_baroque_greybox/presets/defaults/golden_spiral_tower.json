@@ -1,0 +1,34 @@
+{
+  "name": "Golden Spiral Tower",
+  "description": "Twisted tower with golden ratio proportions and Solomonic columns",
+  "mode": "VALID",
+  "generators": {
+    "curve_architecture": {
+      "curve_type": "helix",
+      "length": 1600,
+      "wall_height": 600,
+      "wall_thickness": 30,
+      "floor_enabled": true,
+      "floor_thickness": 15,
+      "ceiling_enabled": true,
+      "cross_section": "octagonal",
+      "twist": 180,
+      "taper_ratio": 0.618,
+      "helix_radius": 600,
+      "helix_turns": 2.0,
+      "samples": 48,
+      "segments": 8
+    },
+    "column_solomonic": {
+      "shaft_height": 600,
+      "radius_bottom": 30,
+      "radius_top": 25,
+      "fluting_count": 16,
+      "fluting_depth": 2.5,
+      "twist_turns": 3.0,
+      "base_enabled": true,
+      "capital_enabled": true,
+      "segments": 24
+    }
+  }
+}

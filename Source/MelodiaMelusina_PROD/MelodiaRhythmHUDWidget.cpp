@@ -14,14 +14,18 @@
 #include "Layout/Geometry.h"
 #include "MelodiaCoreRulesLibrary.h"
 #include "MelodiaEncounterTrigger.h"
+#include "MelodiaHUDDecor.h"
+#include "MelodiaHUDFonts.h"
 #include "MelodiaPortal.h"
 #include "MelodiaQuestManagerBase.h"
 #include "MelodiaRestPoint.h"
+#include "MelodiaExplorationInputComponent.h"
+#include "MelodiaGlideComponent.h"
+#include "MelodiaPickableFlower.h"
 #include "MelodiaRhythmGameModeBase.h"
 #include "MelodiaPCGEncounterSpawner.h"
 #include "MelodiaPCGWalkableIndex.h"
 #include "Rendering/DrawElements.h"
-#include "Styling/CoreStyle.h"
 #include "Styling/SlateBrush.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,17 +66,130 @@ FPaintGeometry PaintBox(const FGeometry& Geometry, const FVector2f Position, con
 	return Geometry.ToPaintGeometry(Size, FSlateLayoutTransform(Position));
 }
 
-void PaintLabel(FSlateWindowElementList& OutDrawElements, const FGeometry& Geometry, const int32 LayerId, const FVector2f Position, const FString& Text, const int32 FontSize, const FLinearColor& Tint)
+void PaintLabel(
+	FSlateWindowElementList& OutDrawElements,
+	const FGeometry& Geometry,
+	const int32 LayerId,
+	const FVector2f Position,
+	const FString& Text,
+	const int32 FontSize,
+	const FLinearColor& Tint,
+	const MelodiaHUDFonts::ERole FontRole = MelodiaHUDFonts::ERole::Body,
+	const float MaxWidth = 420.0f)
 {
-	const FSlateFontInfo FontInfo = FCoreStyle::GetDefaultFontStyle("Regular", FontSize);
+	const FSlateFontInfo FontInfo = MelodiaHUDFonts::Get(FontRole, FontSize);
 	FSlateDrawElement::MakeText(
 		OutDrawElements,
 		LayerId,
-		PaintBox(Geometry, Position, V2f(260.0f, static_cast<float>(FontSize + 8))),
+		PaintBox(Geometry, Position, V2f(MaxWidth, static_cast<float>(FontSize + 10))),
 		FText::FromString(Text),
 		FontInfo,
 		ESlateDrawEffect::None,
 		Tint);
+}
+
+void PaintSoftPanel(
+	FSlateWindowElementList& OutDrawElements,
+	const FGeometry& Geometry,
+	int32& LayerId,
+	const FVector2f Position,
+	const FVector2f Size,
+	const FLinearColor& FillTint,
+	const FLinearColor& BorderTint,
+	const float BorderThickness = 2.0f)
+{
+	const FSlateBrush PanelBrush = MakeTintBrush(FillTint);
+	FSlateDrawElement::MakeBox(OutDrawElements, ++LayerId, PaintBox(Geometry, Position, Size), &PanelBrush, ESlateDrawEffect::None, FillTint);
+
+	TArray<FVector2f> Border;
+	Border.Add(Position + V2f(6.0f, 0.0f));
+	Border.Add(Position + V2f(Size.X - 6.0f, 0.0f));
+	Border.Add(Position + V2f(Size.X, 6.0f));
+	Border.Add(Position + V2f(Size.X, Size.Y - 6.0f));
+	Border.Add(Position + V2f(Size.X - 6.0f, Size.Y));
+	Border.Add(Position + V2f(6.0f, Size.Y));
+	Border.Add(Position + V2f(0.0f, Size.Y - 6.0f));
+	Border.Add(Position + V2f(0.0f, 6.0f));
+	Border.Add(Position + V2f(6.0f, 0.0f));
+	FSlateDrawElement::MakeLines(OutDrawElements, ++LayerId, Geometry.ToPaintGeometry(), Border, ESlateDrawEffect::None, BorderTint, true, BorderThickness);
+}
+
+struct FMelodiaHUDLayout
+{
+	explicit FMelodiaHUDLayout(const FVector2f& InLocalSize)
+		: LocalSize(InLocalSize)
+	{
+	}
+
+	FVector2f LocalSize;
+	float SafeSide = 24.0f;
+	float SafeBottom = 22.0f;
+	float ActionBarHeight = 118.0f;
+	float CommandRowHeight = 54.0f;
+	float EnemyPanelHeight = 84.0f;
+	float EnemyPanelY = 18.0f;
+	float FollowUpBadgeHeight = 32.0f;
+
+	float ActionBarY() const { return LocalSize.Y - ActionBarHeight - SafeBottom; }
+	float CommandRowY() const { return ActionBarY() - CommandRowHeight - 12.0f; }
+	float EnemyBottomY() const { return EnemyPanelY + EnemyPanelHeight + FollowUpBadgeHeight + 10.0f; }
+	float TurnRailX() const { return LocalSize.X - 82.0f - SafeSide; }
+	float TurnRailYStart = 92.0f;
+	float TurnRailYEnd() const { return CommandRowY() - 16.0f; }
+	float PartyPanelWidth() const { return FMath::Min(LocalSize.X * 0.34f, 420.0f); }
+
+	float HighwayLaneY() const
+	{
+		const float MinY = EnemyBottomY() + 20.0f;
+		const float MaxY = CommandRowY() - 78.0f;
+		return FMath::Clamp(LocalSize.Y * 0.43f, MinY, FMath::Max(MinY, MaxY));
+	}
+};
+
+bool ShouldPaintExplorationHUD(const UMelodiaRhythmHUDWidget* Widget)
+{
+	if (!Widget || !Widget->bDrawExplorationHUD)
+	{
+		return false;
+	}
+
+	const UWorld* World = Widget->GetWorld();
+	if (!World)
+	{
+		return true;
+	}
+
+	const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(World));
+	if (!GameMode)
+	{
+		return true;
+	}
+
+	return GameMode->CurrentLoopPhase == EMelodiaLoopPhase::ExplorationReady
+		|| GameMode->CurrentLoopPhase == EMelodiaLoopPhase::Bootstrapping;
+}
+
+bool ShouldPaintBattleHUD(const UMelodiaRhythmHUDWidget* Widget)
+{
+	if (!Widget || !Widget->bDrawNativeCuteCombatHUD || !Widget->bCuteCombatThemeApplied)
+	{
+		return false;
+	}
+
+	const UWorld* World = Widget->GetWorld();
+	if (!World)
+	{
+		return true;
+	}
+
+	const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(World));
+	if (!GameMode)
+	{
+		return true;
+	}
+
+	return GameMode->CurrentLoopPhase == EMelodiaLoopPhase::Battle
+		|| GameMode->CurrentLoopPhase == EMelodiaLoopPhase::VictoryReward;
 }
 
 FString InitialForName(const FString& Name)
@@ -139,14 +256,19 @@ void UMelodiaRhythmHUDWidget::UpdateSmoothedBars(const float InDeltaTime)
 
 int32 UMelodiaRhythmHUDWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FWidgetStyle& InWidgetStyle, const bool bParentEnabled) const
 {
-	int32 CurrentLayer = Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+	// WBP_RhythmHUD designer widgets (PulseRing, JudgmentText, etc.) overlap native HSR paint — skip them when native HUD is active.
+	int32 CurrentLayer = LayerId;
+	if (!bDrawNativeCuteCombatHUD)
+	{
+		CurrentLayer = Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+	}
 
-	if (bDrawExplorationHUD)
+	if (ShouldPaintExplorationHUD(this))
 	{
 		PaintExplorationHUD(OutDrawElements, AllottedGeometry, CurrentLayer);
 	}
 
-	if (!bDrawNativeCuteCombatHUD || !bCuteCombatThemeApplied)
+	if (!ShouldPaintBattleHUD(this))
 	{
 		SyncMutablePaintStats();
 		return CurrentLayer;
@@ -161,173 +283,161 @@ int32 UMelodiaRhythmHUDWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 		return CurrentLayer;
 	}
 
-	++CurrentLayer;
-	const float PanelWidth = FMath::Clamp(LocalSize.X * 0.46f, 420.0f, 760.0f);
-	const float PanelHeight = 126.0f;
-	const FVector2f PanelPosition(28.0f, LocalSize.Y - PanelHeight - 26.0f);
-	const FVector2f PanelSize(PanelWidth, PanelHeight);
-
-	const FSlateBrush PanelBrush = MakeTintBrush(PanelTint);
-	FSlateDrawElement::MakeBox(
-		OutDrawElements,
-		CurrentLayer,
-		PaintBox(AllottedGeometry, PanelPosition, PanelSize),
-		&PanelBrush,
-		ESlateDrawEffect::None,
-		PanelTint);
-
-	++CurrentLayer;
-	const FLinearColor OuterFiligree = FiligreeTint;
-	TArray<FVector2f> FramePoints;
-	FramePoints.Add(PanelPosition + V2f(18.0f, 8.0f));
-	FramePoints.Add(PanelPosition + V2f(PanelSize.X - 18.0f, 8.0f));
-	FramePoints.Add(PanelPosition + V2f(PanelSize.X - 8.0f, 18.0f));
-	FramePoints.Add(PanelPosition + V2f(PanelSize.X - 8.0f, PanelSize.Y - 18.0f));
-	FramePoints.Add(PanelPosition + V2f(PanelSize.X - 18.0f, PanelSize.Y - 8.0f));
-	FramePoints.Add(PanelPosition + V2f(18.0f, PanelSize.Y - 8.0f));
-	FramePoints.Add(PanelPosition + V2f(8.0f, PanelSize.Y - 18.0f));
-	FramePoints.Add(PanelPosition + V2f(8.0f, 18.0f));
-	FramePoints.Add(PanelPosition + V2f(18.0f, 8.0f));
-	FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer, AllottedGeometry.ToPaintGeometry(), FramePoints, ESlateDrawEffect::None, OuterFiligree, true, 2.0f);
-
+	const FMelodiaHUDLayout Layout(LocalSize);
 	const float Time = GetHUDTimeSeconds();
-	const float Curl = FMath::Sin(Time * 2.4f) * 6.0f;
-	for (int32 CornerIndex = 0; CornerIndex < 4; ++CornerIndex)
-	{
-		const bool bRight = CornerIndex == 1 || CornerIndex == 2;
-		const bool bBottom = CornerIndex >= 2;
-		const FVector2f Corner = PanelPosition + V2f(bRight ? PanelSize.X - 30.0f : 30.0f, bBottom ? PanelSize.Y - 30.0f : 30.0f);
-		const float XSign = bRight ? -1.0f : 1.0f;
-		const float YSign = bBottom ? -1.0f : 1.0f;
-		TArray<FVector2f> CurlPoints;
-		CurlPoints.Add(Corner);
-		CurlPoints.Add(Corner + V2f(XSign * (18.0f + Curl), YSign * 4.0f));
-		CurlPoints.Add(Corner + V2f(XSign * 34.0f, YSign * (18.0f - Curl * 0.4f)));
-		CurlPoints.Add(Corner + V2f(XSign * 18.0f, YSign * 32.0f));
-		FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer, AllottedGeometry.ToPaintGeometry(), CurlPoints, ESlateDrawEffect::None, FiligreeTint, true, 2.2f);
-	}
-	++MutableNativeFiligreePaintCount;
+	const FLinearColor HSRGold = FiligreeTint;
+	const FLinearColor HSRBlue = FLinearColor(0.52f, 0.78f, 1.0f, 0.94f);
+	const FLinearColor HSRPanelFill = FLinearColor(0.09f, 0.07f, 0.14f, 0.88f);
+	const FLinearColor HSRPanelBorder = FLinearColor(0.78f, 0.66f, 1.0f, 0.72f);
 
-	++CurrentLayer;
-	const float GaugePercent = LastUltimateGaugeMax > 0.0f ? FMath::Clamp(DisplayedUltimate / LastUltimateGaugeMax, 0.0f, 1.0f) : 0.0f;
-	const FVector2f GaugePosition = PanelPosition + V2f(28.0f, PanelSize.Y - 34.0f);
-	const FVector2f GaugeSize(PanelSize.X - 56.0f, 12.0f);
-	const FSlateBrush GaugeBackBrush = MakeTintBrush(FLinearColor(0.23f, 0.16f, 0.30f, 0.92f));
-	const FSlateBrush GaugeFillBrush = MakeTintBrush(bUltimateReadyVisible ? FiligreeTint : UltimateGaugeTint);
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, GaugePosition, GaugeSize), &GaugeBackBrush, ESlateDrawEffect::None, FLinearColor(0.23f, 0.16f, 0.30f, 0.92f));
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 1, PaintBox(AllottedGeometry, GaugePosition, V2f(GaugeSize.X * GaugePercent, GaugeSize.Y)), &GaugeFillBrush, ESlateDrawEffect::None, bUltimateReadyVisible ? FiligreeTint : UltimateGaugeTint);
-	CurrentLayer += 2;
-	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, PanelPosition + V2f(30.0f, 18.0f), TEXT("MELUSINA"), 14, FLinearColor(0.98f, 0.88f, 1.0f, 0.94f));
-	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, PanelPosition + V2f(30.0f, 44.0f), LastActionPromptText.IsEmpty() ? TEXT("Space/1=Basic | 2=Skill | R=Ultimate") : LastActionPromptText, 13, FLinearColor(0.82f, 0.74f, 0.96f, 0.92f));
-	const float PartyHPPercent = LastPartyMaxHP > 0.0f ? FMath::Clamp(DisplayedPartyHP / LastPartyMaxHP, 0.0f, 1.0f) : 0.0f;
-	const FVector2f PartyGaugePosition = PanelPosition + V2f(30.0f, 68.0f);
-	const FVector2f PartyGaugeSize(180.0f, 8.0f);
-	const FSlateBrush PartyGaugeBackBrush = MakeTintBrush(FLinearColor(0.18f, 0.12f, 0.22f, 0.92f));
-	const FSlateBrush PartyGaugeFillBrush = MakeTintBrush(FLinearColor(0.42f, 0.92f, 0.72f, 0.95f));
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, PartyGaugePosition, PartyGaugeSize), &PartyGaugeBackBrush, ESlateDrawEffect::None, FLinearColor(0.18f, 0.12f, 0.22f, 0.92f));
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 1, PaintBox(AllottedGeometry, PartyGaugePosition, V2f(PartyGaugeSize.X * PartyHPPercent, PartyGaugeSize.Y)), &PartyGaugeFillBrush, ESlateDrawEffect::None, FLinearColor(0.42f, 0.92f, 0.72f, 0.95f));
-	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer + 2, PartyGaugePosition + V2f(0.0f, -18.0f), FString::Printf(TEXT("HP %.0f/%.0f"), LastPartyHP, LastPartyMaxHP), 11, FLinearColor(0.72f, 0.98f, 0.84f, 0.92f));
-	CurrentLayer += 3;
-	++MutableNativePartyVitalsPaintCount;
-	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, GaugePosition + V2f(0.0f, -22.0f), FString::Printf(TEXT("ULT %d%%"), FMath::RoundToInt(GaugePercent * 100.0f)), 12, bUltimateReadyVisible ? FiligreeTint : UltimateGaugeTint);
-	++MutableNativeLabelPaintCount;
-
-	const int32 SkillPointMax = FMath::Clamp(LastSkillPointMax, 1, 5);
-	const int32 SkillPoints = FMath::Clamp(LastSkillPoints, 0, SkillPointMax);
-	const FVector2f SkillPipStart = PanelPosition + V2f(PanelSize.X - 154.0f, 24.0f);
-	const FVector2f SkillPipSize(18.0f, 18.0f);
-	for (int32 PipIndex = 0; PipIndex < SkillPointMax; ++PipIndex)
-	{
-		const bool bFilled = PipIndex < SkillPoints;
-		const FVector2f PipPosition = SkillPipStart + V2f(static_cast<float>(PipIndex) * 24.0f, 0.0f);
-		const FLinearColor PipTint = bFilled ? FLinearColor(0.56f, 0.88f, 1.0f, 0.95f) : FLinearColor(0.24f, 0.18f, 0.30f, 0.82f);
-		const FSlateBrush PipBrush = MakeTintBrush(PipTint);
-		FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, PipPosition, SkillPipSize), &PipBrush, ESlateDrawEffect::None, PipTint);
-		TArray<FVector2f> PipLine;
-		PipLine.Add(PipPosition + V2f(4.0f, 13.0f));
-		PipLine.Add(PipPosition + V2f(9.0f, 5.0f));
-		PipLine.Add(PipPosition + V2f(14.0f, 13.0f));
-		FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer + 1, AllottedGeometry.ToPaintGeometry(), PipLine, ESlateDrawEffect::None, bFilled ? PanelTint : FiligreeTint, true, 1.5f);
-	}
-	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer + 1, SkillPipStart + V2f(-26.0f, -2.0f), TEXT("SP"), 12, FLinearColor(0.74f, 0.92f, 1.0f, 0.92f));
-	CurrentLayer += 2;
-	++MutableNativeLabelPaintCount;
-	++MutableNativeSkillPointPaintCount;
-
+	// ── TOP: enemy status ───────────────────────────────────────────────────
 	const float EnemyHPPercent = LastEnemyMaxHP > 0.0f ? FMath::Clamp(DisplayedEnemyHP / LastEnemyMaxHP, 0.0f, 1.0f) : 0.0f;
-	const FVector2f EnemyPanelSize(FMath::Clamp(LocalSize.X * 0.34f, 360.0f, 560.0f), 66.0f);
-	const FVector2f EnemyPanelPosition((LocalSize.X - EnemyPanelSize.X) * 0.5f, 28.0f);
-	const FSlateBrush EnemyPanelBrush = MakeTintBrush(FLinearColor(0.12f, 0.07f, 0.12f, 0.72f));
-	const FSlateBrush EnemyHPBackBrush = MakeTintBrush(FLinearColor(0.24f, 0.10f, 0.18f, 0.92f));
-	const FSlateBrush EnemyHPFillBrush = MakeTintBrush(FLinearColor(0.96f, 0.28f, 0.58f, 0.95f));
 	const float BreakPercent = LastEnemyToughnessMax > 0.0f ? FMath::Clamp(DisplayedEnemyToughness / LastEnemyToughnessMax, 0.0f, 1.0f) : 0.0f;
-	const FSlateBrush BreakBackBrush = MakeTintBrush(FLinearColor(0.10f, 0.14f, 0.24f, 0.92f));
-	const FSlateBrush BreakFillBrush = MakeTintBrush(bEnemyBreakVisible ? FiligreeTint : FLinearColor(0.42f, 0.82f, 1.0f, 0.95f));
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, EnemyPanelPosition, EnemyPanelSize), &EnemyPanelBrush, ESlateDrawEffect::None, FLinearColor(0.12f, 0.07f, 0.12f, 0.72f));
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 1, PaintBox(AllottedGeometry, EnemyPanelPosition + V2f(18.0f, 43.0f), V2f(EnemyPanelSize.X - 36.0f, 8.0f)), &EnemyHPBackBrush, ESlateDrawEffect::None, FLinearColor(0.24f, 0.10f, 0.18f, 0.92f));
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 2, PaintBox(AllottedGeometry, EnemyPanelPosition + V2f(18.0f, 43.0f), V2f((EnemyPanelSize.X - 36.0f) * EnemyHPPercent, 8.0f)), &EnemyHPFillBrush, ESlateDrawEffect::None, FLinearColor(0.96f, 0.28f, 0.58f, 0.95f));
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 3, PaintBox(AllottedGeometry, EnemyPanelPosition + V2f(18.0f, 54.0f), V2f(EnemyPanelSize.X - 36.0f, 5.0f)), &BreakBackBrush, ESlateDrawEffect::None, FLinearColor(0.10f, 0.14f, 0.24f, 0.92f));
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 4, PaintBox(AllottedGeometry, EnemyPanelPosition + V2f(18.0f, 54.0f), V2f((EnemyPanelSize.X - 36.0f) * BreakPercent, 5.0f)), &BreakFillBrush, ESlateDrawEffect::None, bEnemyBreakVisible ? FiligreeTint : FLinearColor(0.42f, 0.82f, 1.0f, 0.95f));
-	CurrentLayer += 5;
-	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, EnemyPanelPosition + V2f(20.0f, 7.0f), TEXT("MELODY SLIME"), 13, FLinearColor(1.0f, 0.82f, 0.92f, 0.94f));
-	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, EnemyPanelPosition + V2f(EnemyPanelSize.X - 116.0f, 7.0f), FString::Printf(TEXT("%.0f/%.0f"), LastEnemyHP, LastEnemyMaxHP), 12, FLinearColor(1.0f, 0.74f, 0.82f, 0.92f));
-	const FLinearColor IntentTint = bLastUltimateInterrupted ? FLinearColor(1.0f, 0.82f, 0.32f, 0.95f) : (bLastUltimateWindow ? FiligreeTint : FLinearColor(0.78f, 0.84f, 1.0f, 0.90f));
-	const FString IntentText = FString::Printf(TEXT("%s -> %s %.0f"), LastCommandName.IsEmpty() ? TEXT("Ready") : *LastCommandName, *LastEnemyIntentName, LastEnemyIntentPower);
-	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, EnemyPanelPosition + V2f(20.0f, 25.0f), IntentText, 12, IntentTint);
-	++MutableNativeLabelPaintCount;
-	++MutableNativeEnemyVitalsPaintCount;
-	++MutableNativeIntentPaintCount;
-	++MutableNativeBreakGaugePaintCount;
+	const FVector2f EnemyPanelSize(FMath::Clamp(LocalSize.X * 0.36f, 340.0f, 520.0f), Layout.EnemyPanelHeight);
+	const FVector2f EnemyPanelPosition((LocalSize.X - EnemyPanelSize.X) * 0.5f, Layout.EnemyPanelY);
+	PaintSoftPanel(OutDrawElements, AllottedGeometry, CurrentLayer, EnemyPanelPosition, EnemyPanelSize, HSRPanelFill, HSRPanelBorder);
+	if (const FSlateBrush* FrameBrush = MelodiaHUDDecor::GetFrameBrush())
+	{
+		MelodiaHUDDecor::PaintDecorImage(OutDrawElements, AllottedGeometry, CurrentLayer, FrameBrush, EnemyPanelPosition - V2f(8.0f, 8.0f), EnemyPanelSize + V2f(16.0f, 16.0f), FLinearColor(1.0f, 1.0f, 1.0f, 0.35f));
+	}
 
+	const FSlateBrush EnemyHPBackBrush = MakeTintBrush(FLinearColor(0.20f, 0.10f, 0.18f, 0.92f));
+	const FSlateBrush EnemyHPFillBrush = MakeTintBrush(FLinearColor(0.96f, 0.32f, 0.62f, 0.96f));
+	const FSlateBrush BreakBackBrush = MakeTintBrush(FLinearColor(0.10f, 0.14f, 0.26f, 0.92f));
+	const FSlateBrush BreakFillBrush = MakeTintBrush(bEnemyBreakVisible ? HSRGold : HSRBlue);
+	const float BarWidth = EnemyPanelSize.X - 36.0f;
+	FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, EnemyPanelPosition + V2f(18.0f, 52.0f), V2f(BarWidth, 8.0f)), &EnemyHPBackBrush, ESlateDrawEffect::None, FLinearColor(0.20f, 0.10f, 0.18f, 0.92f));
+	FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, EnemyPanelPosition + V2f(18.0f, 52.0f), V2f(BarWidth * EnemyHPPercent, 8.0f)), &EnemyHPFillBrush, ESlateDrawEffect::None, FLinearColor(0.96f, 0.32f, 0.62f, 0.96f));
+	if (!bCompactBattleHUD)
+	{
+		FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, EnemyPanelPosition + V2f(18.0f, 64.0f), V2f(BarWidth, 5.0f)), &BreakBackBrush, ESlateDrawEffect::None, FLinearColor(0.10f, 0.14f, 0.26f, 0.92f));
+		FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, EnemyPanelPosition + V2f(18.0f, 64.0f), V2f(BarWidth * BreakPercent, 5.0f)), &BreakFillBrush, ESlateDrawEffect::None, bEnemyBreakVisible ? HSRGold : HSRBlue);
+	}
+	PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, EnemyPanelPosition + V2f(18.0f, 8.0f), TEXT("MELODY SLIME"), 15, FLinearColor(1.0f, 0.88f, 0.96f, 0.96f), MelodiaHUDFonts::ERole::Title, 260.0f);
+	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, EnemyPanelPosition + V2f(EnemyPanelSize.X - 108.0f, 10.0f), FString::Printf(TEXT("%.0f / %.0f"), LastEnemyHP, LastEnemyMaxHP), 12, FLinearColor(1.0f, 0.78f, 0.86f, 0.94f), MelodiaHUDFonts::ERole::Bold, 120.0f);
+	if (!bCompactBattleHUD)
+	{
+		const FLinearColor IntentTint = bLastUltimateInterrupted ? HSRGold : (bLastUltimateWindow ? HSRGold : HSRBlue);
+		const FString IntentText = FString::Printf(TEXT("%s  ›  %s %.0f"), LastCommandName.IsEmpty() ? TEXT("Ready") : *LastCommandName, *LastEnemyIntentName, LastEnemyIntentPower);
+		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, EnemyPanelPosition + V2f(18.0f, 30.0f), IntentText, 11, IntentTint, MelodiaHUDFonts::ERole::Body, BarWidth);
+		++MutableNativeIntentPaintCount;
+		++MutableNativeBreakGaugePaintCount;
+	}
+	++MutableNativeEnemyVitalsPaintCount;
+	++MutableNativeLabelPaintCount;
+
+	if (!bCompactBattleHUD)
+	{
 	const bool bFollowUpActive = bBreakFollowUpAvailableVisible || bBreakFollowUpConsumedVisible;
 	const float BadgePulse = 0.5f + 0.5f * FMath::Sin(Time * 5.0f);
-	const FVector2f BadgeSize(166.0f, 28.0f);
-	const FVector2f BadgePosition = EnemyPanelPosition + V2f((EnemyPanelSize.X - BadgeSize.X) * 0.5f, EnemyPanelSize.Y + 8.0f);
+	const FVector2f BadgeSize(180.0f, Layout.FollowUpBadgeHeight);
+	const FVector2f BadgePosition = EnemyPanelPosition + V2f((EnemyPanelSize.X - BadgeSize.X) * 0.5f, EnemyPanelSize.Y + 6.0f);
 	const FLinearColor BadgeTint = bBreakFollowUpAvailableVisible
 		? FLinearColor(0.98f, 0.78f + 0.12f * BadgePulse, 0.36f, 0.94f)
-		: (bBreakFollowUpConsumedVisible ? FLinearColor(0.68f, 0.52f, 0.96f, 0.88f) : FLinearColor(0.18f, 0.14f, 0.24f, 0.58f));
-	const FLinearColor BadgeTextTint = bFollowUpActive ? PanelTint : FLinearColor(0.62f, 0.55f, 0.72f, 0.78f);
-	const FSlateBrush BadgeBrush = MakeTintBrush(BadgeTint);
+		: (bBreakFollowUpConsumedVisible ? FLinearColor(0.68f, 0.52f, 0.96f, 0.88f) : FLinearColor(0.14f, 0.11f, 0.20f, 0.45f));
 	const FString BadgeText = bBreakFollowUpAvailableVisible
 		? TEXT("FOLLOW-UP READY")
-		: (bBreakFollowUpConsumedVisible ? FString::Printf(TEXT("FOLLOW +%.0f"), LastFollowUpBonusDamage) : TEXT("FOLLOW-UP"));
-	FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, BadgePosition, BadgeSize), &BadgeBrush, ESlateDrawEffect::None, BadgeTint);
-	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer + 1, BadgePosition + V2f(16.0f, 6.0f), BadgeText, 12, BadgeTextTint);
-	CurrentLayer += 2;
-	++MutableNativeFollowUpPaintCount;
-	++MutableNativeLabelPaintCount;
+		: (bBreakFollowUpConsumedVisible ? FString::Printf(TEXT("FOLLOW +%.0f"), LastFollowUpBonusDamage) : TEXT(""));
+	if (bFollowUpActive)
+	{
+		const FSlateBrush BadgeBrush = MakeTintBrush(BadgeTint);
+		FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, BadgePosition, BadgeSize), &BadgeBrush, ESlateDrawEffect::None, BadgeTint);
+		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, BadgePosition + V2f(14.0f, 7.0f), BadgeText, 12, PanelTint, MelodiaHUDFonts::ERole::Bold, 180.0f);
+		++MutableNativeFollowUpPaintCount;
+	}
 
-	const FVector2f TurnRailPosition(LocalSize.X - 96.0f, 112.0f);
-	const FVector2f TurnSlotSize(66.0f, 44.0f);
+	// ── RIGHT: turn order rail (stays above action bar, clear of center) ───────
+	const FVector2f TurnSlotSize(68.0f, 42.0f);
 	const int32 TurnSlotCount = FMath::Max(4, LastTurnOrderPreview.Num());
+	const float TurnSlotStep = 48.0f;
+	const float TurnRailMaxY = Layout.TurnRailYEnd();
 	for (int32 SlotIndex = 0; SlotIndex < TurnSlotCount; ++SlotIndex)
 	{
-		const float SlotY = TurnRailPosition.Y + static_cast<float>(SlotIndex) * 52.0f;
+		const float SlotY = Layout.TurnRailYStart + static_cast<float>(SlotIndex) * TurnSlotStep;
+		if (SlotY + TurnSlotSize.Y > TurnRailMaxY)
+		{
+			break;
+		}
 		const bool bActiveSlot = SlotIndex == ActiveTurnOrderIndex;
-		const FLinearColor SlotTint = bActiveSlot ? FLinearColor(0.98f, 0.78f, 0.32f, 0.92f) : FLinearColor(0.20f, 0.16f, 0.28f, 0.78f);
-		const FLinearColor InnerTint = SlotIndex % 2 == 0 ? FLinearColor(0.68f, 0.48f, 0.92f, 0.92f) : FLinearColor(0.44f, 0.72f, 0.96f, 0.92f);
+		const FLinearColor SlotTint = bActiveSlot ? HSRGold : FLinearColor(0.18f, 0.14f, 0.24f, 0.82f);
+		const FLinearColor InnerTint = SlotIndex % 2 == 0 ? FLinearColor(0.68f, 0.48f, 0.92f, 0.92f) : HSRBlue;
 		const FString UnitName = LastTurnOrderPreview.IsValidIndex(SlotIndex) ? LastTurnOrderPreview[SlotIndex] : (SlotIndex % 2 == 0 ? TEXT("Melusina") : TEXT("Slime"));
 		const FSlateBrush SlotBrush = MakeTintBrush(SlotTint);
 		const FSlateBrush InnerBrush = MakeTintBrush(InnerTint);
-		FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, V2f(TurnRailPosition.X, SlotY), TurnSlotSize), &SlotBrush, ESlateDrawEffect::None, SlotTint);
-		FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 1, PaintBox(AllottedGeometry, V2f(TurnRailPosition.X + 12.0f, SlotY + 9.0f), V2f(22.0f, 22.0f)), &InnerBrush, ESlateDrawEffect::None, InnerTint);
-		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer + 2, V2f(TurnRailPosition.X + 17.0f, SlotY + 9.0f), InitialForName(UnitName), 14, FLinearColor(0.06f, 0.04f, 0.08f, 0.95f));
-		TArray<FVector2f> TickPoints;
-		TickPoints.Add(V2f(TurnRailPosition.X - 10.0f, SlotY + 22.0f));
-		TickPoints.Add(V2f(TurnRailPosition.X - (bActiveSlot ? 30.0f : 20.0f), SlotY + 22.0f));
-		FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer + 3, AllottedGeometry.ToPaintGeometry(), TickPoints, ESlateDrawEffect::None, FiligreeTint, true, bActiveSlot ? 3.0f : 1.4f);
-		CurrentLayer += 4;
+		const FVector2f SlotPos(Layout.TurnRailX(), SlotY);
+		FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, SlotPos, TurnSlotSize), &SlotBrush, ESlateDrawEffect::None, SlotTint);
+		FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, SlotPos + V2f(10.0f, 8.0f), V2f(24.0f, 24.0f)), &InnerBrush, ESlateDrawEffect::None, InnerTint);
+		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, SlotPos + V2f(16.0f, 8.0f), InitialForName(UnitName), 14, FLinearColor(0.06f, 0.04f, 0.08f, 0.95f), MelodiaHUDFonts::ERole::Bold, 40.0f);
 	}
-	++MutableNativeLabelPaintCount;
-	++MutableNativePortraitPaintCount;
 	++MutableNativeTurnRailPaintCount;
+	++MutableNativePortraitPaintCount;
+	}
 
-	// Command menu is only "live" on the player's turn; dim it while the enemy is acting.
+	// ── BOTTOM: party action bar ─────────────────────────────────────────────
+	const FVector2f PanelSize(Layout.PartyPanelWidth(), Layout.ActionBarHeight);
+	const FVector2f PanelPosition(Layout.SafeSide, Layout.ActionBarY());
+	PaintSoftPanel(OutDrawElements, AllottedGeometry, CurrentLayer, PanelPosition, PanelSize, PanelTint, HSRGold, 2.2f);
+	++MutableNativeFiligreePaintCount;
+
+	const float GaugePercent = LastUltimateGaugeMax > 0.0f ? FMath::Clamp(DisplayedUltimate / LastUltimateGaugeMax, 0.0f, 1.0f) : 0.0f;
+	const float PartyHPPercent = LastPartyMaxHP > 0.0f ? FMath::Clamp(DisplayedPartyHP / LastPartyMaxHP, 0.0f, 1.0f) : 0.0f;
+	PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, PanelPosition + V2f(18.0f, 10.0f), TEXT("MELUSINA"), 16, FLinearColor(0.98f, 0.90f, 1.0f, 0.96f), MelodiaHUDFonts::ERole::Title, 180.0f);
+	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, PanelPosition + V2f(18.0f, 34.0f),
+		LastActionPromptText.IsEmpty() ? TEXT("Space/1=Basic | 2=Skill (rhythm) | 4=Flee") : LastActionPromptText,
+		12, FLinearColor(0.84f, 0.78f, 0.98f, 0.92f), MelodiaHUDFonts::ERole::Body, PanelSize.X - 36.0f);
+
+	const FVector2f PartyGaugePosition = PanelPosition + V2f(18.0f, 58.0f);
+	const FVector2f PartyGaugeSize(FMath::Min(200.0f, PanelSize.X * 0.46f), 9.0f);
+	const FSlateBrush PartyGaugeBackBrush = MakeTintBrush(FLinearColor(0.16f, 0.11f, 0.20f, 0.92f));
+	const FSlateBrush PartyGaugeFillBrush = MakeTintBrush(FLinearColor(0.42f, 0.92f, 0.72f, 0.96f));
+	FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, PartyGaugePosition, PartyGaugeSize), &PartyGaugeBackBrush, ESlateDrawEffect::None, FLinearColor(0.16f, 0.11f, 0.20f, 0.92f));
+	FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, PartyGaugePosition, V2f(PartyGaugeSize.X * PartyHPPercent, PartyGaugeSize.Y)), &PartyGaugeFillBrush, ESlateDrawEffect::None, FLinearColor(0.42f, 0.92f, 0.72f, 0.96f));
+	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, PartyGaugePosition + V2f(0.0f, -16.0f), FString::Printf(TEXT("HP %.0f/%.0f"), LastPartyHP, LastPartyMaxHP), 11, FLinearColor(0.72f, 0.98f, 0.84f, 0.92f), MelodiaHUDFonts::ERole::Bold, 160.0f);
+	++MutableNativePartyVitalsPaintCount;
+
+	if (!bCompactBattleHUD)
+	{
+	const FVector2f GaugePosition = PanelPosition + V2f(18.0f, PanelSize.Y - 24.0f);
+	const FVector2f GaugeSize(PanelSize.X - 36.0f, 11.0f);
+	const FSlateBrush GaugeBackBrush = MakeTintBrush(FLinearColor(0.20f, 0.14f, 0.28f, 0.92f));
+	const FSlateBrush GaugeFillBrush = MakeTintBrush(bUltimateReadyVisible ? HSRGold : UltimateGaugeTint);
+	FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, GaugePosition, GaugeSize), &GaugeBackBrush, ESlateDrawEffect::None, FLinearColor(0.20f, 0.14f, 0.28f, 0.92f));
+	FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, GaugePosition, V2f(GaugeSize.X * GaugePercent, GaugeSize.Y)), &GaugeFillBrush, ESlateDrawEffect::None, bUltimateReadyVisible ? HSRGold : UltimateGaugeTint);
+	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, GaugePosition + V2f(0.0f, -18.0f), FString::Printf(TEXT("ULT %d%%"), FMath::RoundToInt(GaugePercent * 100.0f)), 11, bUltimateReadyVisible ? HSRGold : UltimateGaugeTint, MelodiaHUDFonts::ERole::Accent, 120.0f);
+
+	const int32 SkillPointMax = FMath::Clamp(LastSkillPointMax, 1, 5);
+	const int32 SkillPoints = FMath::Clamp(LastSkillPoints, 0, SkillPointMax);
+	const FVector2f SkillPipStart = PanelPosition + V2f(PanelSize.X - 28.0f - static_cast<float>(SkillPointMax) * 22.0f, 14.0f);
+	for (int32 PipIndex = 0; PipIndex < SkillPointMax; ++PipIndex)
+	{
+		const bool bFilled = PipIndex < SkillPoints;
+		const FVector2f PipPosition = SkillPipStart + V2f(static_cast<float>(PipIndex) * 22.0f, 0.0f);
+		const FLinearColor PipTint = bFilled ? HSRBlue : FLinearColor(0.22f, 0.17f, 0.28f, 0.82f);
+		if (bFilled && MelodiaHUDDecor::GetStarBrush())
+		{
+			MelodiaHUDDecor::PaintDecorImage(OutDrawElements, AllottedGeometry, ++CurrentLayer, MelodiaHUDDecor::GetStarBrush(), PipPosition, V2f(18.0f, 18.0f), PipTint);
+		}
+		else
+		{
+			const FSlateBrush PipBrush = MakeTintBrush(PipTint);
+			FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, PipPosition, V2f(18.0f, 18.0f)), &PipBrush, ESlateDrawEffect::None, PipTint);
+		}
+	}
+	PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, SkillPipStart + V2f(-24.0f, 1.0f), TEXT("SP"), 12, HSRBlue, MelodiaHUDFonts::ERole::Bold, 40.0f);
+	++MutableNativeSkillPointPaintCount;
+	++MutableNativeLabelPaintCount;
+	}
+
+	if (!bCompactBattleHUD)
+	{
+	// ── CENTER-BOTTOM: command cards (HSR action row, centered above bar) ────
 	const float CommandBannerAge = Time - LastBattlePhaseTime;
 	const bool bEnemyTurnActive = LastBattlePhaseLabel.Equals(TEXT("Enemy Turn")) && CommandBannerAge >= 0.0f && CommandBannerAge <= 1.4f;
 	const float CommandMenuAlpha = bEnemyTurnActive ? 0.34f : 1.0f;
-	const FVector2f CommandStart(PanelPosition.X + PanelSize.X + 22.0f, LocalSize.Y - 82.0f);
-	const FVector2f CommandSize(112.0f, 52.0f);
+	const FVector2f CommandSize(104.0f, Layout.CommandRowHeight);
+	const float CommandGap = 12.0f;
+	const float CommandRowWidth = 3.0f * CommandSize.X + 2.0f * CommandGap;
+	const FVector2f CommandStart((LocalSize.X - CommandRowWidth) * 0.5f, Layout.CommandRowY());
 	const FString CommandLabels[3] = { TEXT("BASIC"), TEXT("SKILL"), TEXT("ULT") };
 	for (int32 CardIndex = 0; CardIndex < 3; ++CardIndex)
 	{
@@ -335,88 +445,43 @@ int32 UMelodiaRhythmHUDWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 		const bool bHighlighted = bUltimateCard && bUltimateReadyVisible && !bEnemyTurnActive;
 		const bool bSkillCard = CardIndex == 1;
 		const bool bSkillAvailable = LastSkillPoints > 0;
-		const FVector2f CardPosition = CommandStart + V2f(static_cast<float>(CardIndex) * 122.0f, 0.0f);
-		if (CardPosition.X + CommandSize.X > LocalSize.X - 120.0f)
-		{
-			break;
-		}
+		const FVector2f CardPosition = CommandStart + V2f(static_cast<float>(CardIndex) * (CommandSize.X + CommandGap), 0.0f);
 		FLinearColor CardTint = bHighlighted
-			? FLinearColor(0.98f, 0.70f, 0.24f, 0.94f)
-			: ((bSkillCard && !bSkillAvailable) ? FLinearColor(0.11f, 0.09f, 0.13f, 0.72f) : FLinearColor(0.16f, 0.12f, 0.22f, 0.84f));
+			? FLinearColor(0.98f, 0.72f, 0.22f, 0.94f)
+			: ((bSkillCard && !bSkillAvailable) ? FLinearColor(0.11f, 0.09f, 0.13f, 0.72f) : FLinearColor(0.14f, 0.11f, 0.20f, 0.86f));
 		FLinearColor CommandTextTint = (bSkillCard && !bSkillAvailable)
 			? FLinearColor(0.52f, 0.48f, 0.58f, 0.82f)
-			: (bHighlighted ? PanelTint : FLinearColor(0.98f, 0.88f, 1.0f, 0.94f));
+			: (bHighlighted ? PanelTint : FLinearColor(0.98f, 0.90f, 1.0f, 0.94f));
 		CardTint.A *= CommandMenuAlpha;
 		CommandTextTint.A *= CommandMenuAlpha;
-		const FSlateBrush CardBrush = MakeTintBrush(CardTint);
-		FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, CardPosition, CommandSize), &CardBrush, ESlateDrawEffect::None, CardTint);
-		TArray<FVector2f> CardGlyph;
-		CardGlyph.Add(CardPosition + V2f(20.0f, 36.0f));
-		CardGlyph.Add(CardPosition + V2f(38.0f, 16.0f + static_cast<float>(CardIndex) * 3.0f));
-		CardGlyph.Add(CardPosition + V2f(58.0f, 32.0f));
-		CardGlyph.Add(CardPosition + V2f(82.0f, 18.0f));
-		FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer + 1, AllottedGeometry.ToPaintGeometry(), CardGlyph, ESlateDrawEffect::None, bHighlighted ? PanelTint : CommandTextTint, true, 2.0f);
-		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer + 2, CardPosition + V2f(16.0f, 8.0f), CommandLabels[CardIndex], 12, CommandTextTint);
-		CurrentLayer += 3;
+		PaintSoftPanel(OutDrawElements, AllottedGeometry, CurrentLayer, CardPosition, CommandSize, CardTint, bHighlighted ? HSRGold : HSRPanelBorder, bHighlighted ? 2.4f : 1.6f);
+		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, CardPosition + V2f(14.0f, 10.0f), CommandLabels[CardIndex], 13, CommandTextTint, MelodiaHUDFonts::ERole::Bold, 90.0f);
+		if (bSkillCard && bNoteHighwayActive)
+		{
+			PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, CardPosition + V2f(14.0f, 30.0f), TEXT("♪ LIVE"), 10, HSRBlue, MelodiaHUDFonts::ERole::Musical, 90.0f);
+		}
 	}
-	++MutableNativeLabelPaintCount;
 	++MutableNativeCommandCardPaintCount;
-
-	const float DamageFlashAge = Time - LastDamageFlashTime;
-	if (DamageFlashAge >= 0.0f && DamageFlashAge <= 0.45f)
-	{
-		const float DamageFlashAlpha = FMath::Clamp(1.0f - DamageFlashAge / 0.45f, 0.0f, 1.0f);
-		const FSlateBrush FlashBrush = MakeTintBrush(FLinearColor(1.0f, 0.85f, 0.35f, 0.22f * DamageFlashAlpha));
-		FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, V2f(0.0f, 0.0f), LocalSize), &FlashBrush, ESlateDrawEffect::None, FLinearColor(1.0f, 0.85f, 0.35f, 0.22f * DamageFlashAlpha));
-		++CurrentLayer;
-		++MutableNativeDamageFlashPaintCount;
 	}
 
-	const float BurstAge = Time - LastSparkleBurstTime;
-	const float BurstAlpha = FMath::Clamp(1.0f - BurstAge / 1.2f, 0.0f, 1.0f);
-	const int32 SparkleTotal = BurstAlpha > 0.0f ? 18 : 8;
-	for (int32 SparkleIndex = 0; SparkleIndex < SparkleTotal; ++SparkleIndex)
-	{
-		const float Seed = static_cast<float>(SparkleIndex);
-		const float Phase = Time * (0.9f + Seed * 0.07f) + Seed * 1.618f;
-		const float Drift = FMath::Frac(FMath::Sin(Seed * 12.9898f) * 43758.5453f);
-		const FVector2f Center = PanelPosition + V2f(
-			PanelSize.X * (0.12f + 0.78f * Drift),
-			PanelSize.Y * (0.18f + 0.48f * FMath::Frac(Drift * 2.37f)) - FMath::Sin(Phase) * 8.0f);
-		const float Radius = (BurstAlpha > 0.0f ? 4.5f + BurstAlpha * 6.0f : 3.0f) + FMath::Sin(Phase * 2.0f) * 1.5f;
-		const FLinearColor LocalSparkleTint = FLinearColor(SparkleTint.R, SparkleTint.G, SparkleTint.B, SparkleTint.A * (0.35f + BurstAlpha * 0.65f));
-		TArray<FVector2f> SparkleH;
-		SparkleH.Add(Center + V2f(-Radius, 0.0f));
-		SparkleH.Add(Center + V2f(Radius, 0.0f));
-		TArray<FVector2f> SparkleV;
-		SparkleV.Add(Center + V2f(0.0f, -Radius));
-		SparkleV.Add(Center + V2f(0.0f, Radius));
-		FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer, AllottedGeometry.ToPaintGeometry(), SparkleH, ESlateDrawEffect::None, LocalSparkleTint, true, 1.5f);
-		FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer, AllottedGeometry.ToPaintGeometry(), SparkleV, ESlateDrawEffect::None, LocalSparkleTint, true, 1.5f);
-	}
-	++MutableNativeSparklePaintCount;
-
+	// ── CENTER: note highway (between enemy and command row) ─────────────────
 	if (bNoteHighwayActive && HighwayNotes.Num() > 0)
 	{
-		++CurrentLayer;
-		const float LaneWidth = FMath::Clamp(LocalSize.X * 0.62f, 480.0f, 920.0f);
-		const float LaneHeight = 72.0f;
-		const FVector2f LanePosition((LocalSize.X - LaneWidth) * 0.5f, LocalSize.Y * 0.58f);
+		const float LaneWidth = FMath::Clamp(LocalSize.X * 0.56f, 420.0f, 820.0f);
+		const float LaneHeight = 68.0f;
+		const FVector2f LanePosition((LocalSize.X - LaneWidth) * 0.5f, Layout.HighwayLaneY());
 		const FVector2f LaneSize(LaneWidth, LaneHeight);
-		const FSlateBrush LaneBrush = MakeTintBrush(FLinearColor(0.08f, 0.06f, 0.12f, 0.82f));
-		FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, LanePosition, LaneSize), &LaneBrush, ESlateDrawEffect::None, FLinearColor(0.08f, 0.06f, 0.12f, 0.82f));
+		PaintSoftPanel(OutDrawElements, AllottedGeometry, CurrentLayer, LanePosition, LaneSize, FLinearColor(0.06f, 0.05f, 0.10f, 0.86f), HSRGold, 2.0f);
 
-		const float HitX = LaneWidth * 0.70f;
-		const FVector2f HitLineStart = LanePosition + V2f(HitX, 8.0f);
-		const FVector2f HitLineEnd = LanePosition + V2f(HitX, LaneHeight - 8.0f);
+		const float HitX = LaneWidth * 0.72f;
 		TArray<FVector2f> HitLine;
-		HitLine.Add(HitLineStart);
-		HitLine.Add(HitLineEnd);
-		FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer + 1, AllottedGeometry.ToPaintGeometry(), HitLine, ESlateDrawEffect::None, FiligreeTint, true, 3.0f);
+		HitLine.Add(LanePosition + V2f(HitX, 6.0f));
+		HitLine.Add(LanePosition + V2f(HitX, LaneHeight - 6.0f));
+		FSlateDrawElement::MakeLines(OutDrawElements, ++CurrentLayer, AllottedGeometry.ToPaintGeometry(), HitLine, ESlateDrawEffect::None, HSRGold, true, 3.0f);
 
 		const float ScrollBeats = FMath::Max(0.5f, HighwayScrollBeatsAhead);
-		const float NoteWidth = 28.0f;
-		const float NoteHeight = 44.0f;
+		const float NoteWidth = 26.0f;
+		const float NoteHeight = 42.0f;
 		for (const FMelodiaHighwayNote& Note : HighwayNotes)
 		{
 			const float BeatDelta = Note.TargetBeat - HighwayBeatPosition;
@@ -427,33 +492,78 @@ int32 UMelodiaRhythmHUDWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 			}
 
 			const FVector2f NotePosition = LanePosition + V2f(NormalizedX - NoteWidth * 0.5f, (LaneHeight - NoteHeight) * 0.5f);
-			FLinearColor NoteTint(SparkleTint.R, SparkleTint.G, SparkleTint.B, 0.88f);
+			FLinearColor NoteTint(SparkleTint.R, SparkleTint.G, SparkleTint.B, 0.90f);
 			if (Note.bResolved)
 			{
 				NoteTint = MelodiaGradeTint(Note.Grade, SparkleTint);
 			}
-			const FSlateBrush NoteBrush = MakeTintBrush(NoteTint);
-			FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer + 2, PaintBox(AllottedGeometry, NotePosition, V2f(NoteWidth, NoteHeight)), &NoteBrush, ESlateDrawEffect::None, NoteTint);
-
-			TArray<FVector2f> NoteStem;
-			NoteStem.Add(NotePosition + V2f(NoteWidth * 0.5f, NoteHeight * 0.5f));
-			NoteStem.Add(NotePosition + V2f(NoteWidth * 0.5f, NoteHeight * 0.5f - FMath::Clamp(static_cast<float>(Note.Pitch - 60) * 1.8f, -18.0f, 18.0f)));
-			FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer + 3, AllottedGeometry.ToPaintGeometry(), NoteStem, ESlateDrawEffect::None, NoteTint, true, 2.0f);
+			if (MelodiaHUDDecor::GetMagicBrush())
+			{
+				MelodiaHUDDecor::PaintDecorImage(OutDrawElements, AllottedGeometry, ++CurrentLayer, MelodiaHUDDecor::GetMagicBrush(), NotePosition, V2f(NoteWidth, NoteHeight), NoteTint);
+			}
+			else
+			{
+				const FSlateBrush NoteBrush = MakeTintBrush(NoteTint);
+				FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, NotePosition, V2f(NoteWidth, NoteHeight)), &NoteBrush, ESlateDrawEffect::None, NoteTint);
+			}
 		}
 
-		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer + 4, LanePosition + V2f(12.0f, -22.0f), TEXT("NOTE HIGHWAY"), 12, FLinearColor(0.92f, 0.84f, 1.0f, 0.94f));
-		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer + 4, LanePosition + V2f(LaneWidth - 170.0f, -22.0f), TEXT("Space / 1 = hit"), 11, FLinearColor(0.74f, 0.88f, 1.0f, 0.90f));
-		CurrentLayer += 5;
+		PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, LanePosition + V2f(10.0f, -20.0f), TEXT("NOTE HIGHWAY"), 12, FLinearColor(0.94f, 0.86f, 1.0f, 0.94f), MelodiaHUDFonts::ERole::Accent, 180.0f);
+		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, LanePosition + V2f(LaneWidth - 150.0f, -20.0f), TEXT("Space / 1 = hit"), 11, HSRBlue, MelodiaHUDFonts::ERole::Body, 160.0f);
 		++MutableNativeHighwayPaintCount;
-		++MutableNativeLabelPaintCount;
 	}
 
-	// Floating combat text (damage popups) — rise and fade near the relevant combatant panel.
+	// Damage flash overlay
+	const float DamageFlashAge = Time - LastDamageFlashTime;
+	if (DamageFlashAge >= 0.0f && DamageFlashAge <= 0.45f)
+	{
+		const float DamageFlashAlpha = FMath::Clamp(1.0f - DamageFlashAge / 0.45f, 0.0f, 1.0f);
+		const FSlateBrush FlashBrush = MakeTintBrush(FLinearColor(1.0f, 0.85f, 0.35f, 0.18f * DamageFlashAlpha));
+		FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, V2f(0.0f, 0.0f), LocalSize), &FlashBrush, ESlateDrawEffect::None, FLinearColor(1.0f, 0.85f, 0.35f, 0.18f * DamageFlashAlpha));
+		++MutableNativeDamageFlashPaintCount;
+	}
+
+	// Sparkle decorations (Kenney sprites when available, line fallback otherwise)
+	if (!bCompactBattleHUD)
+	{
+	const float BurstAge = Time - LastSparkleBurstTime;
+	const float BurstAlpha = FMath::Clamp(1.0f - BurstAge / 1.2f, 0.0f, 1.0f);
+	const int32 SparkleTotal = BurstAlpha > 0.0f ? 14 : 6;
+	for (int32 SparkleIndex = 0; SparkleIndex < SparkleTotal; ++SparkleIndex)
+	{
+		const float Seed = static_cast<float>(SparkleIndex);
+		const float Phase = Time * (0.9f + Seed * 0.07f) + Seed * 1.618f;
+		const float Drift = FMath::Frac(FMath::Sin(Seed * 12.9898f) * 43758.5453f);
+		const FVector2f Center = PanelPosition + V2f(
+			PanelSize.X * (0.10f + 0.80f * Drift),
+			PanelSize.Y * (0.20f + 0.50f * FMath::Frac(Drift * 2.37f)) - FMath::Sin(Phase) * 6.0f);
+		const FLinearColor LocalSparkleTint(SparkleTint.R, SparkleTint.G, SparkleTint.B, SparkleTint.A * (0.35f + BurstAlpha * 0.65f));
+		const float DecorSize = 12.0f + FMath::Sin(Phase * 2.0f) * 3.0f;
+		if (const FSlateBrush* SparkBrush = (SparkleIndex % 2 == 0) ? MelodiaHUDDecor::GetSparkBrush() : MelodiaHUDDecor::GetStarBrush())
+		{
+			MelodiaHUDDecor::PaintDecorImage(OutDrawElements, AllottedGeometry, ++CurrentLayer, SparkBrush, Center - V2f(DecorSize * 0.5f, DecorSize * 0.5f), V2f(DecorSize, DecorSize), LocalSparkleTint);
+		}
+		else
+		{
+			const float Radius = DecorSize * 0.45f;
+			TArray<FVector2f> SparkleH;
+			SparkleH.Add(Center + V2f(-Radius, 0.0f));
+			SparkleH.Add(Center + V2f(Radius, 0.0f));
+			TArray<FVector2f> SparkleV;
+			SparkleV.Add(Center + V2f(0.0f, -Radius));
+			SparkleV.Add(Center + V2f(0.0f, Radius));
+			FSlateDrawElement::MakeLines(OutDrawElements, ++CurrentLayer, AllottedGeometry.ToPaintGeometry(), SparkleH, ESlateDrawEffect::None, LocalSparkleTint, true, 1.5f);
+			FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer, AllottedGeometry.ToPaintGeometry(), SparkleV, ESlateDrawEffect::None, LocalSparkleTint, true, 1.5f);
+		}
+	}
+	++MutableNativeSparklePaintCount;
+	}
+
+	// Floating combat text
 	if (FloatingCombatTexts.Num() > 0)
 	{
-		++CurrentLayer;
-		const FVector2f EnemyAnchor = EnemyPanelPosition + V2f(EnemyPanelSize.X * 0.5f, EnemyPanelSize.Y + 6.0f);
-		const FVector2f PartyAnchor = PanelPosition + V2f(120.0f, -14.0f);
+		const FVector2f EnemyAnchor = EnemyPanelPosition + V2f(EnemyPanelSize.X * 0.5f, EnemyPanelSize.Y + 4.0f);
+		const FVector2f PartyAnchor = PanelPosition + V2f(100.0f, -10.0f);
 		bool bPaintedAny = false;
 		for (const FMelodiaFloatingCombatText& Popup : FloatingCombatTexts)
 		{
@@ -469,7 +579,7 @@ int32 UMelodiaRhythmHUDWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 			const FVector2f BaseAnchor = Popup.bAnchorEnemy ? EnemyAnchor : PartyAnchor;
 			const FVector2f TextPos = BaseAnchor + V2f(Lateral - 18.0f, -Rise);
 			const FLinearColor PopupTint(Popup.Tint.R, Popup.Tint.G, Popup.Tint.B, Popup.Tint.A * PopupAlpha);
-			PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, TextPos, Popup.Text, FMath::RoundToInt(16.0f + 8.0f * Pop), PopupTint);
+			PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, TextPos, Popup.Text, FMath::RoundToInt(16.0f + 8.0f * Pop), PopupTint, MelodiaHUDFonts::ERole::Title, 160.0f);
 			bPaintedAny = true;
 		}
 		if (bPaintedAny)
@@ -478,11 +588,10 @@ int32 UMelodiaRhythmHUDWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 		}
 	}
 
-	// Turn-phase banner ("Player Turn" / "Enemy Turn" / "Victory" / "Defeat") with a brief fade.
+	// Turn-phase banner
 	const float BannerAge = Time - LastBattlePhaseTime;
 	if (!LastBattlePhaseLabel.IsEmpty() && BannerAge >= 0.0f && BannerAge <= 2.2f)
 	{
-		++CurrentLayer;
 		const float FadeIn = FMath::Clamp(BannerAge / 0.22f, 0.0f, 1.0f);
 		const float FadeOut = FMath::Clamp((2.2f - BannerAge) / 0.5f, 0.0f, 1.0f);
 		const float BannerAlpha = FMath::Min(FadeIn, FadeOut);
@@ -490,20 +599,14 @@ int32 UMelodiaRhythmHUDWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 		const bool bDefeat = LastBattlePhaseLabel.Contains(TEXT("Defeat"));
 		const bool bEnemyBanner = LastBattlePhaseLabel.Contains(TEXT("Enemy"));
 		FLinearColor BannerTint = bVictory
-			? FLinearColor(0.98f, 0.82f, 0.34f, 0.92f)
+			? HSRGold
 			: (bDefeat ? FLinearColor(0.92f, 0.30f, 0.40f, 0.92f)
-				: (bEnemyBanner ? FLinearColor(0.86f, 0.40f, 0.58f, 0.90f) : FLinearColor(0.52f, 0.78f, 1.0f, 0.90f)));
-		const FVector2f BannerSize(FMath::Clamp(LocalSize.X * 0.40f, 320.0f, 560.0f), 56.0f);
-		const float BannerSlide = (1.0f - FadeIn) * 24.0f;
-		const FVector2f BannerPos((LocalSize.X - BannerSize.X) * 0.5f, LocalSize.Y * 0.30f - BannerSlide);
-		const FSlateBrush BannerBackBrush = MakeTintBrush(FLinearColor(0.07f, 0.05f, 0.10f, 0.78f * BannerAlpha));
-		FSlateDrawElement::MakeBox(OutDrawElements, CurrentLayer, PaintBox(AllottedGeometry, BannerPos, BannerSize), &BannerBackBrush, ESlateDrawEffect::None, FLinearColor(0.07f, 0.05f, 0.10f, 0.78f * BannerAlpha));
-		TArray<FVector2f> BannerEdge;
-		BannerEdge.Add(BannerPos + V2f(0.0f, BannerSize.Y - 2.0f));
-		BannerEdge.Add(BannerPos + V2f(BannerSize.X, BannerSize.Y - 2.0f));
-		FSlateDrawElement::MakeLines(OutDrawElements, CurrentLayer + 1, AllottedGeometry.ToPaintGeometry(), BannerEdge, ESlateDrawEffect::None, FLinearColor(BannerTint.R, BannerTint.G, BannerTint.B, BannerTint.A * BannerAlpha), true, 3.0f);
-		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer + 2, BannerPos + V2f(26.0f, 16.0f), LastBattlePhaseLabel.ToUpper(), 24, FLinearColor(BannerTint.R, BannerTint.G, BannerTint.B, BannerTint.A * BannerAlpha));
-		CurrentLayer += 2;
+				: (bEnemyBanner ? FLinearColor(0.86f, 0.40f, 0.58f, 0.90f) : HSRBlue));
+		const FVector2f BannerSize(FMath::Clamp(LocalSize.X * 0.34f, 300.0f, 480.0f), 52.0f);
+		const float BannerSlide = (1.0f - FadeIn) * 20.0f;
+		const FVector2f BannerPos((LocalSize.X - BannerSize.X) * 0.5f, Layout.EnemyBottomY() + 24.0f - BannerSlide);
+		PaintSoftPanel(OutDrawElements, AllottedGeometry, CurrentLayer, BannerPos, BannerSize, FLinearColor(0.06f, 0.05f, 0.10f, 0.80f * BannerAlpha), FLinearColor(BannerTint.R, BannerTint.G, BannerTint.B, BannerTint.A * BannerAlpha), 2.5f);
+		PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, BannerPos + V2f(22.0f, 14.0f), LastBattlePhaseLabel.ToUpper(), 22, FLinearColor(BannerTint.R, BannerTint.G, BannerTint.B, BannerTint.A * BannerAlpha), MelodiaHUDFonts::ERole::Title, BannerSize.X - 40.0f);
 		++MutableNativeBannerPaintCount;
 	}
 
@@ -548,6 +651,12 @@ void UMelodiaRhythmHUDWidget::ShowBattleStatus_Implementation(const FString& New
 	}
 
 	SetJudgmentString(NewStatusText);
+}
+
+void UMelodiaRhythmHUDWidget::SetHUDMode(const EMelodiaHUDMode NewMode)
+{
+	ActiveHUDMode = NewMode;
+	bDrawExplorationHUD = NewMode == EMelodiaHUDMode::Exploration;
 }
 
 void UMelodiaRhythmHUDWidget::ShowVictoryReward_Implementation(const FString& NewRewardText)
@@ -607,6 +716,13 @@ void UMelodiaRhythmHUDWidget::ShowUltimateActivated_Implementation(const float D
 void UMelodiaRhythmHUDWidget::ApplyCuteCombatTheme_Implementation()
 {
 	bCuteCombatThemeApplied = true;
+	MelodiaHUDFonts::Warmup();
+	MelodiaHUDDecor::Warmup();
+
+	PanelTint = FLinearColor(0.09f, 0.07f, 0.14f, 0.90f);
+	FiligreeTint = FLinearColor(0.98f, 0.82f, 0.38f, 0.94f);
+	SparkleTint = FLinearColor(0.86f, 0.74f, 1.0f, 0.96f);
+	UltimateGaugeTint = FLinearColor(0.62f, 0.48f, 0.98f, 0.95f);
 	if (LastTurnOrderPreview.Num() == 0)
 	{
 		TArray<FString> DefaultTurnOrder;
@@ -618,7 +734,7 @@ void UMelodiaRhythmHUDWidget::ApplyCuteCombatTheme_Implementation()
 	}
 	if (LastActionPromptText.IsEmpty())
 	{
-		ShowActionPrompt(TEXT("Space/1=Basic | 2=Skill | R=Ultimate"));
+		ShowActionPrompt(TEXT("Space/1=Basic | 2=Skill (rhythm) | 4=Flee"));
 	}
 	if (SkillPointUpdateCount == 0)
 	{
@@ -651,10 +767,18 @@ void UMelodiaRhythmHUDWidget::ApplyCuteCombatTheme_Implementation()
 	{
 		TriggerDamageFlash(1.0f);
 	}
-	if (UWidget* FiligreeFrame = FindWidgetByName(TEXT("FiligreeFrame")))
+	if (bDrawNativeCuteCombatHUD && WidgetTree)
 	{
-		FiligreeFrame->SetRenderOpacity(1.0f);
-		FiligreeFrame->SetVisibility(ESlateVisibility::HitTestInvisible);
+		if (UWidget* Root = GetRootWidget())
+		{
+			WidgetTree->ForEachWidget([Root](UWidget* Widget)
+			{
+				if (Widget && Widget != Root)
+				{
+					Widget->SetVisibility(ESlateVisibility::Collapsed);
+				}
+			});
+		}
 	}
 }
 
@@ -819,6 +943,21 @@ void UMelodiaRhythmHUDWidget::SetMinimapMarkers_Implementation(const TArray<FMel
 	++MinimapUpdateCount;
 }
 
+void UMelodiaRhythmHUDWidget::SetMechanicProgression_Implementation(
+	const int32 MechanicLevel,
+	const int32 CurrentXP,
+	const int32 XPToNextLevel,
+	const FString& TierDisplayName,
+	const int32 UnlockedPresetCount)
+{
+	LastMechanicLevel = MechanicLevel;
+	LastMechanicXP = CurrentXP;
+	LastMechanicXPToNext = XPToNextLevel;
+	LastMechanicTierName = TierDisplayName;
+	UnlockedLocationPresetCount = UnlockedPresetCount;
+	++MechanicProgressUpdateCount;
+}
+
 void UMelodiaRhythmHUDWidget::TriggerSparkleBurst_Implementation()
 {
 	++SparkleBurstCount;
@@ -977,18 +1116,31 @@ void UMelodiaRhythmHUDWidget::SyncExplorationHUDFromWorld()
 		}
 		else if (GameMode->CurrentLoopPhase == EMelodiaLoopPhase::ExplorationReady)
 		{
+			FString Prompt = TEXT("WASD explore | Space jump + hold glide | F pick flowers | E interact | I inventory");
+			if (const UMelodiaExplorationInputComponent* ExplorationInput = PlayerPawn->FindComponentByClass<UMelodiaExplorationInputComponent>())
+			{
+				const FString PickPrompt = ExplorationInput->GetNearestPickPrompt();
+				if (!PickPrompt.IsEmpty())
+				{
+					Prompt = PickPrompt;
+				}
+			}
 			if (GameMode->ActiveRestPoint && GameMode->ActiveRestPoint->IsPawnInRange(PlayerPawn))
 			{
-				ShowActionPrompt(GameMode->ActiveRestPoint->InteractionPrompt);
+				Prompt = GameMode->ActiveRestPoint->InteractionPrompt;
 			}
 			else if (GameMode->ActivePortal && GameMode->ActivePortal->IsPawnInRange(PlayerPawn))
 			{
-				ShowActionPrompt(GameMode->ActivePortal->InteractionPrompt);
+				Prompt = GameMode->ActivePortal->InteractionPrompt;
 			}
-			else
+			if (const UMelodiaGlideComponent* Glide = PlayerPawn->FindComponentByClass<UMelodiaGlideComponent>())
 			{
-				ShowActionPrompt(TEXT("Explore: touch the song gate | I=Inventory"));
+				if (Glide->bIsGliding)
+				{
+					Prompt = TEXT("Gliding — release Space to fall");
+				}
 			}
+			ShowActionPrompt(Prompt);
 		}
 	}
 }
@@ -1011,6 +1163,21 @@ void UMelodiaRhythmHUDWidget::PaintExplorationHUD(FSlateWindowElementList& OutDr
 	{
 		return;
 	}
+
+	const float MechanicBannerWidth = FMath::Clamp(LocalSize.X * 0.34f, 280.0f, 460.0f);
+	const FVector2f MechanicBannerPos((LocalSize.X - MechanicBannerWidth) * 0.5f, 18.0f);
+	PaintSoftPanel(OutDrawElements, AllottedGeometry, CurrentLayer, MechanicBannerPos, V2f(MechanicBannerWidth, 52.0f), FLinearColor(0.08f, 0.06f, 0.12f, 0.90f), FiligreeTint, 1.6f);
+	const FString MechanicTitle = FString::Printf(TEXT("MECHANIC LV %d  ·  %s"), LastMechanicLevel, *LastMechanicTierName);
+	PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, MechanicBannerPos + V2f(14.0f, 8.0f), MechanicTitle, 13, FiligreeTint, MelodiaHUDFonts::ERole::Title, MechanicBannerWidth - 28.0f);
+	const float XPPercent = LastMechanicXPToNext > 0 ? FMath::Clamp(static_cast<float>(LastMechanicXP) / static_cast<float>(LastMechanicXPToNext), 0.0f, 1.0f) : 1.0f;
+	const FSlateBrush XPBackBrush = MakeTintBrush(FLinearColor(0.14f, 0.10f, 0.20f, 0.92f));
+	const FSlateBrush XPFillBrush = MakeTintBrush(FLinearColor(0.62f, 0.48f, 0.98f, 0.96f));
+	const FVector2f XPBarPos = MechanicBannerPos + V2f(14.0f, 30.0f);
+	const float XPBarWidth = MechanicBannerWidth - 28.0f;
+	FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, XPBarPos, V2f(XPBarWidth, 8.0f)), &XPBackBrush, ESlateDrawEffect::None, FLinearColor(0.14f, 0.10f, 0.20f, 0.92f));
+	FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, XPBarPos, V2f(XPBarWidth * XPPercent, 8.0f)), &XPFillBrush, ESlateDrawEffect::None, FLinearColor(0.62f, 0.48f, 0.98f, 0.96f));
+	const FString PresetLine = FString::Printf(TEXT("%d/%d location presets  ·  XP %d/%d"), UnlockedLocationPresetCount, 30, LastMechanicXP, LastMechanicXPToNext);
+	PaintLabel(OutDrawElements, AllottedGeometry, CurrentLayer, MechanicBannerPos + V2f(MechanicBannerWidth - 168.0f, 8.0f), PresetLine, 10, FLinearColor(0.82f, 0.74f, 0.96f, 0.88f), MelodiaHUDFonts::ERole::Body, 160.0f);
 
 	const float MapSize = 148.0f;
 	const FVector2f MapTopRight(LocalSize.X - MapSize - 24.0f, 24.0f);
@@ -1043,15 +1210,14 @@ void UMelodiaRhythmHUDWidget::PaintExplorationHUD(FSlateWindowElementList& OutDr
 		FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, MarkerPos - V2f(HalfSize, HalfSize), V2f(MarkerSize, MarkerSize)), &MarkerBrush, ESlateDrawEffect::None, MarkerTint);
 	}
 
-	PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, MapTopRight + V2f(0.0f, MapSize + 4.0f), TEXT("MINIMAP"), 11, FLinearColor(0.82f, 0.74f, 0.96f, 0.92f));
+	PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, MapTopRight + V2f(0.0f, MapSize + 4.0f), TEXT("MINIMAP"), 11, FLinearColor(0.82f, 0.74f, 0.96f, 0.92f), MelodiaHUDFonts::ERole::Accent, 160.0f);
 	++MutableNativeMinimapPaintCount;
 
 	const FVector2f QuestPanelPos(24.0f, 24.0f);
-	const float QuestPanelWidth = FMath::Clamp(LocalSize.X * 0.28f, 240.0f, 360.0f);
+	const float QuestPanelWidth = FMath::Clamp(LocalSize.X * 0.26f, 220.0f, 320.0f);
 	const float QuestPanelHeight = 24.0f + FMath::Clamp(static_cast<float>(QuestLogEntries.Num()), 1.0f, 6.0f) * 22.0f + 18.0f;
-	const FSlateBrush QuestBrush = MakeTintBrush(FLinearColor(0.10f, 0.08f, 0.14f, 0.86f));
-	FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, QuestPanelPos, V2f(QuestPanelWidth, QuestPanelHeight)), &QuestBrush, ESlateDrawEffect::None, FLinearColor(0.10f, 0.08f, 0.14f, 0.86f));
-	PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, QuestPanelPos + V2f(12.0f, 8.0f), TEXT("QUESTS"), 12, FiligreeTint);
+	PaintSoftPanel(OutDrawElements, AllottedGeometry, CurrentLayer, QuestPanelPos, V2f(QuestPanelWidth, QuestPanelHeight), FLinearColor(0.10f, 0.08f, 0.14f, 0.88f), FiligreeTint, 1.8f);
+	PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, QuestPanelPos + V2f(12.0f, 8.0f), TEXT("QUESTS"), 13, FiligreeTint, MelodiaHUDFonts::ERole::Title, 180.0f);
 
 	int32 LineIndex = 0;
 	for (const FString& Entry : QuestLogEntries)
@@ -1060,7 +1226,7 @@ void UMelodiaRhythmHUDWidget::PaintExplorationHUD(FSlateWindowElementList& OutDr
 		const FLinearColor LineTint = bCompletedLine
 			? FLinearColor(0.42f, 0.92f, 0.72f, 0.95f)
 			: FLinearColor(0.88f, 0.84f, 0.98f, 0.92f);
-		PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, QuestPanelPos + V2f(12.0f, 28.0f + static_cast<float>(LineIndex) * 22.0f), Entry, 11, LineTint);
+		PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, QuestPanelPos + V2f(12.0f, 28.0f + static_cast<float>(LineIndex) * 22.0f), Entry, 11, LineTint, MelodiaHUDFonts::ERole::Body, QuestPanelWidth - 24.0f);
 		++LineIndex;
 		if (LineIndex >= 6)
 		{
@@ -1071,12 +1237,11 @@ void UMelodiaRhythmHUDWidget::PaintExplorationHUD(FSlateWindowElementList& OutDr
 
 	if (bInventoryPanelOpen || InventorySlots.Num() > 0)
 	{
-		const float InvWidth = 220.0f;
-		const float InvHeight = bInventoryPanelOpen ? 180.0f : 54.0f;
-		const FVector2f InvPos(LocalSize.X - InvWidth - 24.0f, LocalSize.Y - InvHeight - 24.0f);
-		const FSlateBrush InvBrush = MakeTintBrush(FLinearColor(0.09f, 0.07f, 0.13f, bInventoryPanelOpen ? 0.92f : 0.78f));
-		FSlateDrawElement::MakeBox(OutDrawElements, ++CurrentLayer, PaintBox(AllottedGeometry, InvPos, V2f(InvWidth, InvHeight)), &InvBrush, ESlateDrawEffect::None, FLinearColor(0.09f, 0.07f, 0.13f, 0.92f));
-		PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, InvPos + V2f(12.0f, 8.0f), bInventoryPanelOpen ? TEXT("INVENTORY (I to close)") : TEXT("INVENTORY (I)"), 11, FLinearColor(0.74f, 0.88f, 1.0f, 0.92f));
+		const float InvWidth = 210.0f;
+		const float InvHeight = bInventoryPanelOpen ? 176.0f : 52.0f;
+		const FVector2f InvPos(24.0f, LocalSize.Y - InvHeight - 24.0f);
+		PaintSoftPanel(OutDrawElements, AllottedGeometry, CurrentLayer, InvPos, V2f(InvWidth, InvHeight), FLinearColor(0.09f, 0.07f, 0.13f, bInventoryPanelOpen ? 0.92f : 0.78f), FLinearColor(0.52f, 0.78f, 1.0f, 0.72f), 1.6f);
+		PaintLabel(OutDrawElements, AllottedGeometry, ++CurrentLayer, InvPos + V2f(12.0f, 8.0f), bInventoryPanelOpen ? TEXT("INVENTORY (I to close)") : TEXT("INVENTORY (I)"), 11, FLinearColor(0.74f, 0.88f, 1.0f, 0.92f), MelodiaHUDFonts::ERole::Bold, 200.0f);
 
 		if (bInventoryPanelOpen)
 		{

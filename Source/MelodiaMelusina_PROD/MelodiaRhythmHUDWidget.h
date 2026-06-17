@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "MelodiaQuestTypes.h"
+#include "MelodiaBattleTypes.h"
 #include "MelodiaRhythmExecutionComponent.h"
 #include "MelodiaRhythmHUDWidget.generated.h"
 
@@ -64,6 +65,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Rhythm HUD")
 	void ShowBattleStatus(const FString& NewStatusText);
 	virtual void ShowBattleStatus_Implementation(const FString& NewStatusText);
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Rhythm HUD")
+	void SetHUDMode(EMelodiaHUDMode NewMode);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Rhythm HUD")
 	void ShowVictoryReward(const FString& NewRewardText);
@@ -164,6 +168,28 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Exploration HUD")
 	void SetMinimapMarkers(const TArray<FMelodiaMinimapMarker>& Markers);
 	virtual void SetMinimapMarkers_Implementation(const TArray<FMelodiaMinimapMarker>& Markers);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Melodia|Exploration HUD")
+	void SetMechanicProgression(int32 MechanicLevel, int32 CurrentXP, int32 XPToNextLevel, const FString& TierDisplayName, int32 UnlockedPresetCount);
+	virtual void SetMechanicProgression_Implementation(int32 MechanicLevel, int32 CurrentXP, int32 XPToNextLevel, const FString& TierDisplayName, int32 UnlockedPresetCount);
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	int32 LastMechanicLevel = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	int32 LastMechanicXP = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	int32 LastMechanicXPToNext = 85;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	FString LastMechanicTierName = TEXT("Novice Star");
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	int32 UnlockedLocationPresetCount = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
+	int32 MechanicProgressUpdateCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
 	FString LastBattleStatusText;
@@ -363,6 +389,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Exploration HUD")
 	bool bDrawExplorationHUD = true;
 
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD")
+	EMelodiaHUDMode ActiveHUDMode = EMelodiaHUDMode::Exploration;
+
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Exploration HUD")
 	TArray<FString> QuestLogEntries;
 
@@ -399,17 +428,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm HUD|Style")
 	bool bDrawNativeCuteCombatHUD = true;
 
+	/** When true, battle HUD shows only enemy HP, party HP, action prompt, and note highway (no turn rail / command cards / sparkles). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm HUD|Style")
-	FLinearColor PanelTint = FLinearColor(0.11f, 0.08f, 0.16f, 0.84f);
+	bool bCompactBattleHUD = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm HUD|Style")
-	FLinearColor FiligreeTint = FLinearColor(1.0f, 0.82f, 0.38f, 0.92f);
+	FLinearColor PanelTint = FLinearColor(0.09f, 0.07f, 0.14f, 0.90f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm HUD|Style")
-	FLinearColor SparkleTint = FLinearColor(0.86f, 0.72f, 1.0f, 0.95f);
+	FLinearColor FiligreeTint = FLinearColor(0.98f, 0.82f, 0.38f, 0.94f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm HUD|Style")
-	FLinearColor UltimateGaugeTint = FLinearColor(0.98f, 0.54f, 0.94f, 0.95f);
+	FLinearColor SparkleTint = FLinearColor(0.86f, 0.74f, 1.0f, 0.96f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm HUD|Style")
+	FLinearColor UltimateGaugeTint = FLinearColor(0.62f, 0.48f, 0.98f, 0.95f);
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm HUD|Style")
 	int32 NativePaintFrameCount = 0;

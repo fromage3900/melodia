@@ -1,12 +1,15 @@
 // Drives the tight-coupled note highway: song pattern -> beat-synced hits -> damage resolution.
 
 #include "MelodiaRhythmExecutionComponent.h"
+#include "MelodiaBattleSession.h"
 
 #include "EngineUtils.h"
 #include "MelodiaBattleLoopLibrary.h"
+#include "MelodiaMechanicProgressionSubsystem.h"
 #include "MelodiaMusicManager.h"
 #include "MelodiaQuestManagerBase.h"
 #include "MelodiaRhythmHUDWidget.h"
+#include "MelodiaSongSkillLibrary.h"
 #include "UObject/UObjectIterator.h"
 
 namespace
@@ -59,6 +62,18 @@ void UMelodiaRhythmExecutionComponent::TickComponent(const float DeltaTime, ELev
 
 bool UMelodiaRhythmExecutionComponent::BeginSkillExecution()
 {
+	if (UGameInstance* GI = GetOwner() ? GetOwner()->GetGameInstance() : nullptr)
+	{
+		if (const UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+		{
+			return BeginSkillExecutionById(Progression->State.ActiveSkillId);
+		}
+	}
+	return BeginSkillExecutionById(UMelodiaSongSkillLibrary::GetSkillIdForMechanicLevel(1));
+}
+
+bool UMelodiaRhythmExecutionComponent::BeginSkillExecutionById(const FName SkillId)
+{
 	if (ExecutionState != EMelodiaRhythmExecutionState::Idle)
 	{
 		return false;
@@ -70,17 +85,46 @@ bool UMelodiaRhythmExecutionComponent::BeginSkillExecution()
 		return false;
 	}
 
-	TArray<int32> Pitches = { 60, 64, 67, 72 };
-	TArray<float> Durations = { 1.0f, 1.0f, 1.0f, 1.0f };
-	TArray<FMelodiaSongMaterialInput> Materials;
-	FMelodiaSongMaterialInput Material;
-	Material.MaterialId = TEXT("GoldStucco");
-	Material.RarityTier = 2;
-	Material.PowerModifier = 1.1f;
-	Materials.Add(Material);
+	FMelodiaSongSkillRecipe SkillRecipe;
+	if (!UMelodiaSongSkillLibrary::ResolveSongSkill(this, SkillId, SkillRecipe))
+	{
+		return false;
+	}
 
+	ActiveSkillId = SkillId;
 	bSkillExecution = true;
-	BuildNotesFromSong(Pitches, Durations, EMelodiaInstrument::MusicBox, Materials, true);
+	BuildNotesFromSong(
+		SkillRecipe.NotePitches,
+		SkillRecipe.NoteDurations,
+		SkillRecipe.Instrument,
+		SkillRecipe.Materials,
+		true);
+
+	if (ActiveSpell.SpellElement != SkillRecipe.Element)
+	{
+		ActiveSpell.SpellElement = SkillRecipe.Element;
+	}
+
+	if (SkillRecipe.PowerScalar > 0.0f)
+	{
+		ActiveSpell.Power *= SkillRecipe.PowerScalar;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		if (UGameInstance* GI = World->GetGameInstance())
+		{
+			if (UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+			{
+				for (TActorIterator<AMelodiaQuestManagerBase> It(World); It; ++It)
+				{
+					It->NotifySkillUsed(SkillId);
+					break;
+				}
+			}
+		}
+	}
+
 	return ActiveNotes.Num() > 0;
 }
 
@@ -209,15 +253,25 @@ void UMelodiaRhythmExecutionComponent::BuildNotesFromSong(const TArray<int32>& N
 	{
 		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
-			Widget->ShowActionPrompt(bSkill ? TEXT("Tap on beat | 2=Skill | Space/1=Hit") : TEXT("Tap on beat | Space/1=Hit"));
+			FString SkillLabel = ActiveSpell.DebugSummary.ToString();
+			if (UGameInstance* GI = World->GetGameInstance())
+			{
+				if (const UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+				{
+					SkillLabel = Progression->GetActiveSkillDisplayName().ToString();
+				}
+			}
+			Widget->ShowActionPrompt(bSkill
+				? FString::Printf(TEXT("Skill: %s | Tap on beat | Tab=cycle | 2=Skill"), *SkillLabel)
+				: TEXT("Tap on beat | Space/1=Hit"));
 		}
 	}
 }
 
 void UMelodiaRhythmExecutionComponent::BuildBasicNotes()
 {
-	TArray<int32> Pitches = { 60, 62, 64 };
-	TArray<float> Durations = { 1.0f, 1.0f, 1.0f };
+	TArray<int32> Pitches = { 64, 67 };
+	TArray<float> Durations = { 1.0f, 1.0f };
 	TArray<FMelodiaSongMaterialInput> EmptyMaterials;
 	BuildNotesFromSong(Pitches, Durations, EMelodiaInstrument::MusicBox, EmptyMaterials, false);
 }
@@ -321,6 +375,11 @@ void UMelodiaRhythmExecutionComponent::FinishExecution()
 			bSkillExecution,
 			SkillScalar,
 			ActiveSpell.SPCost);
+
+		if (UMelodiaBattleSession* Session = UMelodiaBattleSession::Get(this))
+		{
+			Session->NotifyRhythmExecutionFinished();
+		}
 	}
 
 	CancelExecution();

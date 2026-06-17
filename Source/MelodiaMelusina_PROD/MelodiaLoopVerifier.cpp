@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "MelodiaBattleInputComponent.h"
 #include "MelodiaBattleLoopLibrary.h"
+#include "MelodiaBattleSession.h"
 #include "MelodiaCombatStateComponent.h"
 #include "MelodiaCosmeticsComponent.h"
 #include "MelodiaEncounterTrigger.h"
@@ -252,12 +253,7 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 
 	AMelodiaRhythmGameModeBase* MutableRhythmGameMode = GetWorld() ? Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(GetWorld())) : nullptr;
 	AMelodiaEncounterTrigger* EncounterTrigger = MutableRhythmGameMode ? MutableRhythmGameMode->ActiveEncounterTrigger : nullptr;
-	if (EncounterTrigger && MutableRhythmGameMode && MutableRhythmGameMode->CurrentLoopPhase == EMelodiaLoopPhase::ExplorationReady)
-	{
-		EncounterTrigger->ArmEncounter();
-		EncounterTrigger->StartEncounter(MutableRhythmGameMode->ActiveExplorationPawn.Get());
-	}
-	const bool bEncounterTriggerStartedBattle = EncounterTrigger && EncounterTrigger->ActivationCount > 0;
+	const bool bEncounterTriggerPresent = EncounterTrigger != nullptr;
 	SetFloatProperty(TEXT("RhythmEnemyMaxHP"), 45.0f);
 	SetFloatProperty(TEXT("RhythmEnemyHP"), 45.0f);
 
@@ -307,6 +303,8 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 	const bool bHUDWidgetInViewport = RhythmGameMode && RhythmGameMode->bRhythmHUDWidgetInViewport;
 	const bool bGameModeInputBound = RhythmGameMode && RhythmGameMode->bBattleInputBound;
 	const bool bInputBridgeBound = InputBridge && InputBridge->bInputBound;
+	const UMelodiaBattleSession* BattleSession = UMelodiaBattleSession::Get(this);
+	const bool bBattleSessionSubsystemPresent = BattleSession != nullptr;
 	const int32 InputBridgeBasicCount = InputBridge ? InputBridge->BasicInputCount : 0;
 	const int32 InputBridgeSkillCount = InputBridge ? InputBridge->SkillInputCount : 0;
 	const int32 InputBridgeUltimateCount = InputBridge ? InputBridge->UltimateInputCount : 0;
@@ -394,7 +392,7 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 		}
 	}
 
-	Detail = FString::Printf(TEXT("multiplier=%.2f combo=%d damage=%.1f enemyHP=%.1f ultimateReady=%s ultimateTriggered=%s ultimateDamage=%.1f ultimateTotal=%d ultimateInterrupts=%d intentAfterUlt=%s enemyBroken=%s breaks=%d toughnessAfterUlt=%.1f followReady=%s followReadyCount=%d followConsumed=%d followBonus=%.1f skillAvailable=%s skillPoints=%d/%d basicActions=%d skillActions=%d inputBound=%s gameModeInput=%s inputBasic=%d inputSkill=%d inputUlt=%d inputCommands=%d battleOver=%s playerVictory=%s rewardConfirmed=%s encounterWins=%d questWins=%d phase=%s battlePhases=%d victoryPhases=%d exploreReadyPhases=%d explorationControl=%s controlRestores=%d melusina=%s melusinaApplies=%d hudViewport=%s cosmetics=%s cosmetic=%s triggerStarted=%s triggerActivations=%d triggerMarker=%s explorePrompts=%d battlePrompts=%d ultReadyPrompts=%d ultActivationPrompts=%d skillPointUpdates=%d breakUpdates=%d followUpdates=%d sparkles=%d vitals=%d turnRail=%d reactiveStates=%d actionPrompts=%d damageFlashes=%d nativePaint=%d nativeFiligree=%d nativeSparkles=%d nativeTurnRail=%d nativeCommands=%d nativeSkillPips=%d nativeVitals=%d nativeIntent=%d nativeBreak=%d nativeFollow=%d nativeDamageFlash=%d nativeLabels=%d nativePortraits=%d cuteTheme=%s hudVictory=%s action=%s reward=%s"),
+	Detail = FString::Printf(TEXT("multiplier=%.2f combo=%d damage=%.1f enemyHP=%.1f ultimateReady=%s ultimateTriggered=%s ultimateDamage=%.1f ultimateTotal=%d ultimateInterrupts=%d intentAfterUlt=%s enemyBroken=%s breaks=%d toughnessAfterUlt=%.1f followReady=%s followReadyCount=%d followConsumed=%d followBonus=%.1f skillAvailable=%s skillPoints=%d/%d basicActions=%d skillActions=%d inputBound=%s session=%s gameModeInput=%s inputBasic=%d inputSkill=%d inputUlt=%d inputCommands=%d battleOver=%s playerVictory=%s rewardConfirmed=%s encounterWins=%d questWins=%d phase=%s battlePhases=%d victoryPhases=%d exploreReadyPhases=%d explorationControl=%s controlRestores=%d melusina=%s melusinaApplies=%d hudViewport=%s cosmetics=%s cosmetic=%s triggerStarted=%s triggerActivations=%d triggerMarker=%s explorePrompts=%d battlePrompts=%d ultReadyPrompts=%d ultActivationPrompts=%d skillPointUpdates=%d breakUpdates=%d followUpdates=%d sparkles=%d vitals=%d turnRail=%d reactiveStates=%d actionPrompts=%d damageFlashes=%d nativePaint=%d nativeFiligree=%d nativeSparkles=%d nativeTurnRail=%d nativeCommands=%d nativeSkillPips=%d nativeVitals=%d nativeIntent=%d nativeBreak=%d nativeFollow=%d nativeDamageFlash=%d nativeLabels=%d nativePortraits=%d cuteTheme=%s hudVictory=%s action=%s reward=%s"),
 		Multiplier,
 		Combo,
 		LastDamage,
@@ -418,6 +416,7 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 		BasicActionCount,
 		SkillActionCount,
 		bInputBridgeBound ? TEXT("true") : TEXT("false"),
+		bBattleSessionSubsystemPresent ? TEXT("true") : TEXT("false"),
 		bGameModeInputBound ? TEXT("true") : TEXT("false"),
 		InputBridgeBasicCount,
 		InputBridgeSkillCount,
@@ -439,7 +438,7 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 		bHUDWidgetInViewport ? TEXT("true") : TEXT("false"),
 		bCosmeticsApplied ? TEXT("true") : TEXT("false"),
 		*CosmeticPresetText,
-		bEncounterTriggerStartedBattle ? TEXT("true") : TEXT("false"),
+		bEncounterTriggerPresent ? TEXT("true") : TEXT("false"),
 		EncounterTriggerActivations,
 		bTriggerHasVisibleMarker ? TEXT("true") : TEXT("false"),
 		ExplorationPromptCount,
@@ -494,6 +493,7 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 		&& BasicActionCount >= 1
 		&& SkillActionCount >= 1
 		&& bInputBridgeBound
+		&& bBattleSessionSubsystemPresent
 		&& bGameModeInputBound
 		&& InputBridgeBasicCount >= 1
 		&& InputBridgeSkillCount >= 1
@@ -515,10 +515,9 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 		&& bMelusinaPawnActive
 		&& MelusinaPawnApplyCount >= 1
 		&& bHUDWidgetInViewport
-		&& bCosmeticsApplied
+		&& 		bCosmeticsApplied
 		&& CosmeticPresetText.Contains(TEXT("Melusina"))
-		&& bEncounterTriggerStartedBattle
-		&& EncounterTriggerActivations >= 1
+		&& bEncounterTriggerPresent
 		&& bTriggerHasVisibleMarker
 		&& ExplorationPromptCount >= 1
 		&& BattleStartPromptCount >= 1

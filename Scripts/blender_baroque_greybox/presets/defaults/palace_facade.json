@@ -1,0 +1,29 @@
+{
+  "name": "Palace Facade",
+  "description": "3-story baroque palace facade with balconies and rustication",
+  "mode": "VALID",
+  "generators": {
+    "facade": {
+      "facade_width": 2400,
+      "story_height": 600,
+      "story_count": 3,
+      "wall_thickness": 30,
+      "window_width": 160,
+      "window_height": 280,
+      "window_sill_height": 120,
+      "windows_per_bay": 1,
+      "pilaster_width": 40,
+      "pilaster_depth": 15,
+      "pilaster_enabled": true,
+      "cornice_enabled": true,
+      "cornice_projection": 25,
+      "balcony_enabled": true,
+      "balcony_depth": 80,
+      "rustication_enabled": true,
+      "rustication_depth": 8,
+      "parapet_enabled": true,
+      "parapet_height": 80,
+      "segments": 12
+    }
+  }
+}

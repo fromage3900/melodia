@@ -25,8 +25,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Melodia|Exploration Input")
 	bool ActivateNearestInteraction();
 
+	UFUNCTION(BlueprintCallable, Category="Melodia|Exploration Input")
+	bool ActivateNearestPickable();
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Exploration Input")
+	FString GetNearestPickPrompt() const;
+
 private:
 	bool bInputBound = false;
+	bool bLocomotionBound = false;
+
+	UInputComponent* ResolveInputComponent() const;
+	bool BindLocomotionInput(UInputComponent* InputComponent);
+
 	void OnInventoryPressed();
 	void OnInteractPressed();
+	void OnPickPressed();
+	void MoveForward(float Value);
+	void MoveRight(float Value);
+	void Turn(float Value);
+	void LookUp(float Value);
 };

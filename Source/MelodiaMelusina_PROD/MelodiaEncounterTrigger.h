@@ -42,10 +42,15 @@ public:
 	TObjectPtr<AActor> LastBattleController;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Encounter", meta=(ClampMin="0"))
-	float PostArmCooldownSeconds = 0.75f;
+	float PostArmCooldownSeconds = 2.5f;
 
+	/** Player must walk at least this far from the arm position before the gate can fire. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Encounter", meta=(ClampMin="0"))
-	float MinPlayerTravelToActivate = 32.0f;
+	float MinPlayerTravelToActivate = 200.0f;
+
+	/** When true, overlap only counts after the player has left the trigger once since arming. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Encounter")
+	bool bRequireReEntryAfterArm = true;
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Encounter")
 	bool StartEncounter(AActor* InstigatorActor = nullptr);
@@ -62,8 +67,12 @@ protected:
 	UFUNCTION()
 	void OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
+	UFUNCTION()
+	void OnTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
 private:
 	bool bEncounterArmed = false;
+	bool bPlayerHasExitedSinceArm = false;
 	double ArmedAtWorldSeconds = -1.0;
 	FVector ArmedPlayerLocation = FVector::ZeroVector;
 	bool bHasArmedPlayerLocation = false;

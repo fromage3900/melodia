@@ -18,7 +18,7 @@ struct FPCGContext;
 // ---------------------------------------------------------------------------
 // Settings — configurable gravity direction for impossible-geometry zones.
 // ---------------------------------------------------------------------------
-UCLASS(BlueprintType)
+UCLASS(BlueprintType, EditInlineNew, meta = (DisplayName = "Gravity Zone", Category = "Custom Elements|Environment"))
 class MELODIAMELUSINA_PROD_API UPCGGravityZoneSettings : public UPCGSettings
 {
 	GENERATED_BODY()

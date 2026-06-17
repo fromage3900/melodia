@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "PCGMelodiaAttributes.h"
+#include "MelodiaSpellTypes.h"
 #include "MelodiaQuestTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -24,7 +25,13 @@ enum class EMelodiaQuestObjectiveType : uint8
 	PerfectNotesInSkill UMETA(DisplayName="Perfect Notes In Skill"),
 	BreakEnemy UMETA(DisplayName="Break Enemy"),
 	WinWithUltimate UMETA(DisplayName="Win With Ultimate"),
-	TalkToNpc UMETA(DisplayName="Talk To NPC")
+	TalkToNpc UMETA(DisplayName="Talk To NPC"),
+	ReachMechanicLevel UMETA(DisplayName="Reach Mechanic Level"),
+	UnlockLocationPreset UMETA(DisplayName="Unlock Location Preset"),
+	UseSongSkill UMETA(DisplayName="Use Song Skill"),
+	EquipElementKey UMETA(DisplayName="Equip Element Key"),
+	UnlockCompanion UMETA(DisplayName="Unlock Companion"),
+	WeaknessHit UMETA(DisplayName="Land Weakness Hit")
 };
 
 USTRUCT(BlueprintType)
@@ -63,6 +70,21 @@ struct MELODIAMELUSINA_PROD_API FMelodiaQuestDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Quest")
 	FString RewardText = TEXT("+50G");
+
+	/** Quest only becomes active when player reaches this mechanic level (0 = no gate). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Quest", meta=(ClampMin="0"))
+	int32 RequiredMechanicLevel = 0;
+
+	/** For UnlockLocationPreset objectives — preset unlocked at this level. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Quest")
+	FName TargetLocationPresetId = NAME_None;
+
+	/** For UseSongSkill / key quests — target skill or key id. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Quest")
+	FName TargetSkillId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Quest")
+	EMelodiaSpellElement TargetElement = EMelodiaSpellElement::Forte;
 };
 
 USTRUCT(BlueprintType)

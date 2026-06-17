@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "MelodiaQuestTypes.h"
+#include "MelodiaSpellTypes.h"
 #include "MelodiaSaveGame.generated.h"
 
 UCLASS(BlueprintType)
@@ -55,6 +56,34 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Run")
 	int32 AreasCompleted = 0;
+
+	// ── Mechanic progression (demo Lv 1–30) ───────────────────────────
+	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Mechanic")
+	int32 MechanicLevel = 1;
+
+	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Mechanic")
+	int32 MechanicXP = 0;
+
+	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Mechanic")
+	int32 MechanicTotalLevelUps = 0;
+
+	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Mechanic")
+	TArray<FName> UnlockedLocationPresetIds;
+
+	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Mechanic")
+	TArray<FName> UnlockedSkillIds;
+
+	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Mechanic")
+	TArray<FName> UnlockedKeyIds;
+
+	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Mechanic")
+	FName ActiveSkillId = NAME_None;
+
+	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Mechanic")
+	EMelodiaSpellElement EquippedKeyElement = EMelodiaSpellElement::Forte;
+
+	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Mechanic")
+	bool bCompanionUnlocked = false;
 
 	// ── Cosmetics ────────────────────────────────────────────────────
 	UPROPERTY(BlueprintReadWrite, Category="Melodia|Save|Cosmetic")

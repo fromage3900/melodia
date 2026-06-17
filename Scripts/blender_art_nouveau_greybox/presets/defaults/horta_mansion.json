@@ -1,0 +1,23 @@
+{
+  "generators": {
+    "stem_column": {
+      "shaft_height": 600,
+      "radius_bottom": 25
+    },
+    "whiplash_wall": {
+      "width": 400,
+      "whiplash_amplitude": 40
+    },
+    "stained_glass": {
+      "width": 160,
+      "height": 280
+    },
+    "iron_railing": {
+      "length": 400,
+      "height": 100
+    }
+  },
+  "metadata": {
+    "version": "1.0"
+  }
+}

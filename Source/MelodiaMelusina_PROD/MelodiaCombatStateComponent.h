@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "MelodiaSpellTypes.h"
 #include "MelodiaCombatStateComponent.generated.h"
 
 UCLASS(Blueprintable, ClassGroup=(Melodia), meta=(BlueprintSpawnableComponent))
@@ -121,6 +122,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Combat")
 	float PartyMaxHP = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Combat")
+	EMelodiaSpellElement EnemyElement = EMelodiaSpellElement::Tide;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Combat")
+	EMelodiaSpellElement EquippedKeyElement = EMelodiaSpellElement::Forte;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Combat")
+	bool bCompanionActive = false;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Combat")
 	float LastPartyDamageTaken = 0.0f;

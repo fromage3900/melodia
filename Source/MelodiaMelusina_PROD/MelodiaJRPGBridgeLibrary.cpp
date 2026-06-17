@@ -2,7 +2,9 @@
 
 #include "MelodiaJRPGBridgeLibrary.h"
 
+#include "Blueprint/UserWidget.h"
 #include "GameFramework/Actor.h"
+#include "MelodiaPartySubsystem.h"
 #include "UObject/UnrealType.h"
 
 namespace
@@ -67,6 +69,84 @@ bool WriteNumericToContainer(const FProperty* Property, void* Container, double 
 		return true;
 	}
 	return false;
+}
+
+bool PropertyNameLooksLikeBattleUI(const FString& Name)
+{
+	return Name.Contains(TEXT("UI"), ESearchCase::IgnoreCase)
+		|| Name.Contains(TEXT("Widget"), ESearchCase::IgnoreCase)
+		|| Name.Contains(TEXT("Dialogue"), ESearchCase::IgnoreCase)
+		|| Name.Contains(TEXT("Viewport"), ESearchCase::IgnoreCase);
+}
+
+void RemoveUserWidgetFromViewport(UObject* Object)
+{
+	if (UUserWidget* Widget = Cast<UUserWidget>(Object))
+	{
+		Widget->RemoveFromParent();
+	}
+}
+
+void HideBattleCameraActor(UObject* Object)
+{
+	if (AActor* CameraActor = Cast<AActor>(Object))
+	{
+		CameraActor->SetActorHiddenInGame(true);
+		CameraActor->SetActorTickEnabled(false);
+	}
+}
+
+void ClearObjectPropertyIfPresent(UObject* Container, FProperty* Property)
+{
+	if (FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property))
+	{
+		ObjectProperty->SetObjectPropertyValue_InContainer(Container, nullptr);
+	}
+}
+
+void TeardownUIPropertiesOnObject(UObject* Container)
+{
+	if (!Container)
+	{
+		return;
+	}
+
+	for (TFieldIterator<FProperty> It(Container->GetClass()); It; ++It)
+	{
+		FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(*It);
+		if (!ObjectProperty)
+		{
+			continue;
+		}
+
+		const FString PropertyName = ObjectProperty->GetName();
+		UObject* Value = ObjectProperty->GetObjectPropertyValue_InContainer(Container);
+		if (!Value)
+		{
+			continue;
+		}
+
+		if (PropertyNameLooksLikeBattleUI(PropertyName))
+		{
+			RemoveUserWidgetFromViewport(Value);
+			ClearObjectPropertyIfPresent(Container, *It);
+			continue;
+		}
+
+		if (PropertyName.Contains(TEXT("Camera"), ESearchCase::IgnoreCase)
+			&& !PropertyName.Contains(TEXT("Component"), ESearchCase::IgnoreCase))
+		{
+			HideBattleCameraActor(Value);
+		}
+	}
+}
+
+void SetControllerBattleFlag(AActor* BattleController, const FName PropertyName, const bool bValue)
+{
+	if (FBoolProperty* BoolProperty = CastField<FBoolProperty>(BattleController->GetClass()->FindPropertyByName(PropertyName)))
+	{
+		BoolProperty->SetPropertyValue_InContainer(BattleController, bValue);
+	}
 }
 }
 
@@ -591,4 +671,168 @@ void UMelodiaJRPGBridgeLibrary::RestorePartyVitals(AActor* BattleController)
 	{
 		SetUnitHP(Member, GetUnitMaxHP(Member));
 	}
+}
+
+bool UMelodiaJRPGBridgeLibrary::TryFleeBattle(AActor* BattleController)
+{
+	if (!BattleController)
+	{
+		return false;
+	}
+
+	const FName FleeCandidates[] = {
+		TEXT("Flee"),
+		TEXT("FleeBattle"),
+		TEXT("TryFlee"),
+		TEXT("RunAway"),
+		TEXT("AttemptFlee"),
+		TEXT("EndBattle"),
+	};
+
+	for (const FName FunctionName : FleeCandidates)
+	{
+		if (UFunction* Function = BattleController->FindFunction(FunctionName))
+		{
+			BattleController->ProcessEvent(Function, nullptr);
+			UE_LOG(LogTemp, Log, TEXT("Melodia JRPG bridge invoked flee via %s."), *FunctionName.ToString());
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(AActor* BattleController)
+{
+	if (!BattleController)
+	{
+		return;
+	}
+
+	TeardownUIPropertiesOnObject(BattleController);
+	if (UObject* CurrentBattle = GetCurrentBattleObject(BattleController))
+	{
+		TeardownUIPropertiesOnObject(CurrentBattle);
+	}
+
+	const FName TeardownFunctions[] = {
+		TEXT("CloseBattleUI"),
+		TEXT("HideBattleUI"),
+		TEXT("RemoveBattleUI"),
+		TEXT("EndBattleUI"),
+		TEXT("ReturnToExplore"),
+		TEXT("ReturnToField"),
+		TEXT("CloseSkillDialogue"),
+	};
+
+	for (const FName FunctionName : TeardownFunctions)
+	{
+		if (UFunction* Function = BattleController->FindFunction(FunctionName))
+		{
+			BattleController->ProcessEvent(Function, nullptr);
+		}
+	}
+
+	SetControllerBattleFlag(BattleController, TEXT("isInBattle"), false);
+	SetControllerBattleFlag(BattleController, TEXT("bIsInBattle"), false);
+	SetControllerBattleFlag(BattleController, TEXT("inBattle"), false);
+
+	UE_LOG(LogTemp, Log, TEXT("Melodia JRPG bridge tore down Phoenix battle UI on %s."), *BattleController->GetName());
+}
+
+bool UMelodiaJRPGBridgeLibrary::TrySetUnitDisplayName(UObject* Unit, const FText& DisplayName)
+{
+	if (!Unit || DisplayName.IsEmpty())
+	{
+		return false;
+	}
+
+	const FName NameCandidates[] = {
+		TEXT("unitName"),
+		TEXT("UnitName"),
+		TEXT("displayName"),
+		TEXT("DisplayName"),
+		TEXT("characterName"),
+		TEXT("CharacterName"),
+	};
+
+	for (const FName PropertyName : NameCandidates)
+	{
+		if (FTextProperty* TextProperty = CastField<FTextProperty>(Unit->GetClass()->FindPropertyByName(PropertyName)))
+		{
+			TextProperty->SetPropertyValue_InContainer(Unit, DisplayName);
+			return true;
+		}
+
+		if (FStrProperty* StringProperty = CastField<FStrProperty>(Unit->GetClass()->FindPropertyByName(PropertyName)))
+		{
+			StringProperty->SetPropertyValue_InContainer(Unit, DisplayName.ToString());
+			return true;
+		}
+
+		if (FNameProperty* NameProperty = CastField<FNameProperty>(Unit->GetClass()->FindPropertyByName(PropertyName)))
+		{
+			NameProperty->SetPropertyValue_InContainer(Unit, FName(*DisplayName.ToString()));
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool UMelodiaJRPGBridgeLibrary::SyncPartyUnitsFromSubsystem(UObject* WorldContextObject, AActor* BattleController)
+{
+	if (!BattleController)
+	{
+		return false;
+	}
+
+	UMelodiaPartySubsystem* Party = UMelodiaPartySubsystem::Get(WorldContextObject ? WorldContextObject : BattleController);
+	if (!Party)
+	{
+		return false;
+	}
+
+	TArray<UObject*> PlayerUnits;
+	if (!GetUnitArray(BattleController, PartyArrayName, PlayerUnits))
+	{
+		return false;
+	}
+
+	int32 ActiveCount = 0;
+	for (int32 Index = 0; Index < PlayerUnits.Num(); ++Index)
+	{
+		UObject* Unit = PlayerUnits[Index];
+		if (!Unit)
+		{
+			continue;
+		}
+
+		const bool bSlotActive = Party->PartySlots.IsValidIndex(Index)
+			&& Party->PartySlots[Index].bActiveInBattle
+			&& !Party->PartySlots[Index].MemberId.IsNone();
+
+		if (AActor* UnitActor = Cast<AActor>(Unit))
+		{
+			UnitActor->SetActorHiddenInGame(!bSlotActive);
+			UnitActor->SetActorEnableCollision(bSlotActive);
+		}
+
+		if (bSlotActive)
+		{
+			TrySetUnitDisplayName(Unit, Party->PartySlots[Index].DisplayName);
+			if (GetUnitCurrentHP(Unit) <= 0.0)
+			{
+				SetUnitHP(Unit, GetUnitMaxHP(Unit));
+			}
+			++ActiveCount;
+		}
+		else
+		{
+			SetUnitHP(Unit, 0.0);
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("Melodia JRPG bridge synced %d active party units (%d Phoenix slots)."), ActiveCount, PlayerUnits.Num());
+	return ActiveCount > 0;
 }

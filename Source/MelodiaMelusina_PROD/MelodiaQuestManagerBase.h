@@ -64,6 +64,9 @@ public:
 	void NotifyItemCollected(FName ItemId, int32 Quantity);
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
+	void NotifyFlowerPicked(FName FlowerItemId, int32 Quantity = 1);
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
 	void SyncHUD(UWorld* World) const;
 
 	UFUNCTION(BlueprintPure, Category="Melodia|Quest")
@@ -76,11 +79,31 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
 	void NotifyPCGRebuilt();
 
+	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
+	void NotifyMechanicLevelChanged(int32 NewMechanicLevel);
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
+	void RegisterMechanicDemoQuests();
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
+	void RegisterProgressionQuestChain();
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
+	void ActivateQuest(FName QuestId);
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
+	void NotifySkillUsed(FName SkillId);
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
+	void NotifyKeyEquipped(EMelodiaSpellElement Element);
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Quest")
+	void NotifyWeaknessHit();
+
 protected:
 	void AddQuestDefinition(const FMelodiaQuestDefinition& Definition);
 	FMelodiaQuestProgress* FindProgress(FName QuestId);
 	const FMelodiaQuestDefinition* FindDefinition(FName QuestId) const;
-	void ActivateQuest(FName QuestId);
 	void AdvanceQuest(FName QuestId, int32 Delta = 1);
 	void CompleteQuest(FName QuestId);
 	void GrantQuestRewards(FName QuestId, APawn* PlayerPawn);

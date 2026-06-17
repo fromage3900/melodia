@@ -1,0 +1,43 @@
+{
+  "name": "Escher Impossible",
+  "description": "MC Escher inspired impossible geometry collection",
+  "mode": "IMPOSSIBLE",
+  "generators": {
+    "penrose_stairs": {
+      "stair_width": 120,
+      "steps_per_flight": 12,
+      "step_height": 20,
+      "step_depth": 30,
+      "landing_size": 200,
+      "wall_thickness": 20,
+      "column_enabled": true,
+      "column_radius": 20,
+      "impossible_overlap": true,
+      "segments": 16
+    },
+    "mobius_walkway": {
+      "radius": 800,
+      "width": 200,
+      "thickness": 20,
+      "twist": 1.0,
+      "railing_enabled": true,
+      "railing_height": 100,
+      "columns_enabled": true,
+      "column_count": 8,
+      "samples": 64,
+      "segments": 8
+    },
+    "recursive_arches": {
+      "arch_width": 600,
+      "arch_height": 800,
+      "arch_depth": 40,
+      "arch_thickness": 25,
+      "depth_levels": 10,
+      "scale_ratio": 0.618,
+      "arch_type": "semicircular",
+      "twist_per_level": 5,
+      "floor_enabled": true,
+      "segments": 16
+    }
+  }
+}

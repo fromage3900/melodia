@@ -1,0 +1,23 @@
+{
+  "generators": {
+    "tree_column": {
+      "trunk_height": 600,
+      "branching_depth": 2
+    },
+    "gaudi_vault": {
+      "width": 400,
+      "length": 600,
+      "rise": 200
+    },
+    "floral_capital": {
+      "radius": 25
+    },
+    "organic_arch": {
+      "width": 180,
+      "height": 320
+    }
+  },
+  "metadata": {
+    "version": "1.0"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "generators": {
+    "stem_column": {
+      "shaft_height": 600
+    },
+    "whiplash_wall": {
+      "width": 400
+    },
+    "stained_glass": {
+      "width": 160,
+      "height": 280
+    },
+    "peacock_fan": {
+      "radius": 80
+    },
+    "lily_bracket": {
+      "radius": 40
+    }
+  },
+  "metadata": {
+    "version": "1.0"
+  }
+}

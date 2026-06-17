@@ -30,7 +30,7 @@ enum class EPCGTileShape : uint8
 // ---------------------------------------------------------------------------
 // Settings — artist-editable parameters for surface tessellation.
 // ---------------------------------------------------------------------------
-UCLASS(BlueprintType)
+UCLASS(BlueprintType, EditInlineNew, meta = (DisplayName = "Tessellation", Category = "Custom Elements|Geometry"))
 class MELODIAMELUSINA_PROD_API UPCGTessellationSettings : public UPCGSettings
 {
 	GENERATED_BODY()

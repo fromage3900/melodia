@@ -28,6 +28,8 @@ class AMelodiaMusicManager;
 class AMelodiaLoopVerifier;
 class APawn;
 class AMelodiaEncounterTrigger;
+class AMelodiaCompanionActor;
+class AMelodiaNPCBase;
 class AMelodiaReverieRunManager;
 class AMelodiaRestPoint;
 class AMelodiaPortal;
@@ -84,6 +86,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	FSoftClassPath QuestManagerClassPath = FSoftClassPath(TEXT("/Game/Melodia/Core/BP_QuestManager.BP_QuestManager_C"));
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
+	FSoftClassPath CompanionClassPath = FSoftClassPath(TEXT("/Game/Melodia/Characters/Companions/BP_CockatooCompanion.BP_CockatooCompanion_C"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
+	FSoftClassPath ProgressionNPCClassPath = FSoftClassPath(TEXT("/Game/Melodia/NPC/BP_NPC_TierTutor.BP_NPC_TierTutor_C"));
+
 	/** Reparent BP_Melusina to AMelodiaCharacterBase for baked-in components. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	FSoftClassPath ExplorationPawnClassPath = FSoftClassPath(TEXT("/Game/Blueprints/Gameplay/BP_Melusina.BP_Melusina_C"));
@@ -100,9 +108,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	bool bRunLoopVerifier = false;
 
+	/** Bare-minimum slice: PlayerStart explore, one song gate, one battle. Skips PCG/quest/verifier extras. Off by default — enable only for smoke tests (?MinimalDemo on URL). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
+	bool bMinimalDemoMode = false;
+
+	/** Legacy rhythm test manager spawns beat-print debug actor — off by default (duplicates Melodia battle clock). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
+	bool bEnableLegacyRhythmTestManager = false;
+
+	/** When true, strips Phoenix BattleUI after encounter init (Melodia-only HUD). False = Option B: keep Phoenix menus for you to replace. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Battle")
+	bool bSuppressPhoenixBattleUI = false;
+
 	/** When true, place encounters/rest/portal from PCG walkable data instead of hardcoded offsets. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|PCG")
-	bool bUsePCGPlacement = true;
+	bool bUsePCGPlacement = false;
 
 	/** Radius (cm) around the PCG volume center used for walkable-point queries. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|PCG", meta=(ClampMin="500"))
@@ -173,6 +193,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
 	TObjectPtr<AMelodiaPortal> ActivePortal;
 
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
+	TObjectPtr<AMelodiaCompanionActor> ActiveCompanion;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
+	TArray<TObjectPtr<AMelodiaNPCBase>> ActiveProgressionNPCs;
+
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Presentation")
 	TObjectPtr<UMelodiaCosmeticsComponent> ActiveCosmeticsComponent;
 
@@ -206,12 +232,17 @@ public:
 	UFUNCTION(BlueprintPure, Category="Melodia|Loop")
 	FString GetLoopPhaseText() const;
 
+	/** Called by UMelodiaBattleSession when an encounter begins. */
+	UFUNCTION(BlueprintCallable, Category="Melodia|Battle")
+	void NotifyBattleSessionBegan(AActor* BattleController);
+
 protected:
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
 	TObjectPtr<AMelodiaMusicManager> ActiveMusicManager;
 
 	FTimerHandle BootstrapRetryHandle;
 	FTimerHandle PCGPlacementRetryHandle;
+	FTimerHandle VictoryAutoExitHandle;
 	int32 PCGPlacementRetryCount = 0;
 	static constexpr int32 MaxPCGPlacementRetries = 20;
 
@@ -226,8 +257,12 @@ protected:
 	bool ShouldRunLoopVerifier() const;
 	void RestoreExplorationControl();
 	void EnsureEncounterTrigger();
+	void EnsureQuestManager();
+	void EnsureCompanionActor();
+	void EnsureProgressionNPCs();
 	void EnsureReverieRunManager();
 	void EnsureWorldInteractions();
+	void EnsurePortfolioFlowers();
 	void EnsurePCGGameplayPlacement();
 	void RetryPCGGameplayPlacement();
 	UPCGComponent* FindPrimaryPCGComponent() const;
@@ -236,5 +271,10 @@ protected:
 	void ApplyPCGPlacedInteractables();
 	void EnsureBattleInputBridge();
 	void EnsureRhythmHUDWidget();
+	void PrepareMelodiaBattleView();
+	void AutoConfirmVictoryIfPending();
+	void PrepareExplorationPresentation();
+	void SanitizeWorldForMinimalDemo();
+	void EnsureBattleMusicClock();
 	void ApplyMelusinaPresentation(APawn* ExplorationPawn);
 };

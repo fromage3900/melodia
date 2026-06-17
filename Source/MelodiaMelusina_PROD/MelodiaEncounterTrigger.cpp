@@ -10,6 +10,10 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "MelodiaBattleLoopLibrary.h"
+#include "MelodiaBattleSession.h"
+#include "MelodiaContentRegistrySubsystem.h"
+#include "MelodiaMechanicProgressionSubsystem.h"
+#include "MelodiaJRPGBridgeLibrary.h"
 #include "MelodiaPCGLibrary.h"
 #include "MelodiaQuestManagerBase.h"
 #include "MelodiaRhythmGameModeBase.h"
@@ -64,6 +68,7 @@ void AMelodiaEncounterTrigger::ArmEncounter()
 	}
 
 	bEncounterArmed = true;
+	bPlayerHasExitedSinceArm = false;
 	ArmedAtWorldSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : -1.0;
 	bHasArmedPlayerLocation = false;
 	if (const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(this)))
@@ -72,10 +77,24 @@ void AMelodiaEncounterTrigger::ArmEncounter()
 		{
 			ArmedPlayerLocation = ExplorationPawn->GetActorLocation();
 			bHasArmedPlayerLocation = true;
+
+			if (bRequireReEntryAfterArm)
+			{
+				TArray<AActor*> OverlappingActors;
+				TriggerSphere->GetOverlappingActors(OverlappingActors, APawn::StaticClass());
+				bPlayerHasExitedSinceArm = !OverlappingActors.Contains(const_cast<APawn*>(ExplorationPawn));
+			}
+			else
+			{
+				bPlayerHasExitedSinceArm = true;
+			}
 		}
 	}
 	TriggerSphere->OnComponentBeginOverlap.AddDynamic(this, &AMelodiaEncounterTrigger::OnTriggerBeginOverlap);
-	UE_LOG(LogTemp, Log, TEXT("Melodia encounter trigger armed at %s."), *GetActorLocation().ToString());
+	TriggerSphere->OnComponentEndOverlap.AddDynamic(this, &AMelodiaEncounterTrigger::OnTriggerEndOverlap);
+	UE_LOG(LogTemp, Log, TEXT("Melodia encounter trigger armed at %s (reEntryRequired=%s)."),
+		*GetActorLocation().ToString(),
+		bRequireReEntryAfterArm ? TEXT("true") : TEXT("false"));
 }
 
 void AMelodiaEncounterTrigger::DisarmEncounter()
@@ -86,17 +105,17 @@ void AMelodiaEncounterTrigger::DisarmEncounter()
 	}
 
 	TriggerSphere->OnComponentBeginOverlap.RemoveDynamic(this, &AMelodiaEncounterTrigger::OnTriggerBeginOverlap);
+	TriggerSphere->OnComponentEndOverlap.RemoveDynamic(this, &AMelodiaEncounterTrigger::OnTriggerEndOverlap);
 	bEncounterArmed = false;
+	bPlayerHasExitedSinceArm = false;
 }
 
 bool AMelodiaEncounterTrigger::StartEncounter(AActor* InstigatorActor)
 {
-	if (const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(this)))
+	AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(this));
+	if (GameMode && GameMode->CurrentLoopPhase != EMelodiaLoopPhase::ExplorationReady)
 	{
-		if (GameMode->CurrentLoopPhase != EMelodiaLoopPhase::ExplorationReady)
-		{
-			return false;
-		}
+		return false;
 	}
 
 	AActor* BattleController = FindOrSpawnBattleController();
@@ -106,14 +125,51 @@ bool AMelodiaEncounterTrigger::StartEncounter(AActor* InstigatorActor)
 		return false;
 	}
 
+	AActor* BattleData = FindOrSpawnBattleData();
+	if (!BattleData)
+	{
+		bLastActivationStartedBattle = false;
+		return false;
+	}
+
 	++ActivationCount;
 	LastBattleController = BattleController;
-	InitializeTemplateBattleController(BattleController);
-	UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(BattleController);
 
-	if (AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(this)))
+	FMelodiaEncounterDefinition Encounter;
+	Encounter.BattleController = BattleController;
+	Encounter.BattleData = BattleData;
+	Encounter.EncounterLevel = 1;
+
+	if (UGameInstance* GI = GetGameInstance())
 	{
-		GameMode->SetLoopPhase(EMelodiaLoopPhase::Battle);
+		if (const UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+		{
+			Encounter.EncounterLevel = Progression->GetMechanicLevel();
+		}
+
+		if (const UMelodiaContentRegistrySubsystem* Registry = GI->GetSubsystem<UMelodiaContentRegistrySubsystem>())
+		{
+			if (const UMelodiaEncounterDataAsset* EncounterAsset = Registry->GetDefaultEncounter())
+			{
+				Encounter.EncounterLevel = EncounterAsset->EncounterLevel > 0
+					? EncounterAsset->EncounterLevel
+					: Encounter.EncounterLevel;
+				Encounter.EncounterDisplayName = EncounterAsset->DisplayName;
+			}
+		}
+	}
+
+	const bool bSuppressPhoenixUI = GameMode ? GameMode->bSuppressPhoenixBattleUI : false;
+	UMelodiaBattleSession* Session = UMelodiaBattleSession::Get(this);
+	if (!Session || !Session->BeginEncounter(Encounter, bSuppressPhoenixUI))
+	{
+		bLastActivationStartedBattle = false;
+		return false;
+	}
+
+	if (GameMode)
+	{
+		GameMode->NotifyBattleSessionBegan(BattleController);
 	}
 
 	for (TActorIterator<AMelodiaQuestManagerBase> QuestIt(GetWorld()); QuestIt; ++QuestIt)
@@ -122,17 +178,9 @@ bool AMelodiaEncounterTrigger::StartEncounter(AActor* InstigatorActor)
 		break;
 	}
 
-	if (UWorld* World = GetWorld())
-	{
-		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
-		{
-			Widget->ShowBattleStatus(TEXT("Battle started"));
-		}
-	}
-
 	bLastActivationStartedBattle = true;
 	DisarmEncounter();
-	UE_LOG(LogTemp, Log, TEXT("Melodia encounter trigger started battle from %s."), InstigatorActor ? *InstigatorActor->GetName() : TEXT("direct activation"));
+	UE_LOG(LogTemp, Log, TEXT("Melodia encounter trigger started battle session from %s."), InstigatorActor ? *InstigatorActor->GetName() : TEXT("direct activation"));
 	return true;
 }
 
@@ -172,7 +220,31 @@ void AMelodiaEncounterTrigger::OnTriggerBeginOverlap(UPrimitiveComponent* Overla
 		}
 	}
 
+	if (bRequireReEntryAfterArm && !bPlayerHasExitedSinceArm)
+	{
+		return;
+	}
+
 	StartEncounter(OtherActor);
+}
+
+void AMelodiaEncounterTrigger::OnTriggerEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if (!bEncounterArmed || !OtherActor || !OtherActor->IsA<APawn>())
+	{
+		return;
+	}
+
+	if (const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(this)))
+	{
+		if (const APawn* ExplorationPawn = GameMode->ActiveExplorationPawn.Get())
+		{
+			if (OtherActor == ExplorationPawn)
+			{
+				bPlayerHasExitedSinceArm = true;
+			}
+		}
+	}
 }
 
 UClass* AMelodiaEncounterTrigger::ResolveClass(const FSoftClassPath& ClassPath) const

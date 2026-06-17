@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "MelodiaSpellTypes.h"
 #include "MelodiaBattleLoopLibrary.generated.h"
 
 struct FMelodiaHighwayNote;
@@ -62,6 +63,9 @@ public:
 	static bool ApplyRhythmExecutionResult(UObject* WorldContextObject, AActor* BattleController, const TArray<FMelodiaHighwayNote>& NoteResults, bool bSkillAction, float SkillScalar, int32 SkillCost);
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop", meta=(DefaultToSelf="WorldContextObject"))
+	static bool TryFleeRhythmBattle(UObject* WorldContextObject, AActor* BattleController);
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop", meta=(DefaultToSelf="WorldContextObject"))
 	static bool ExecuteEnemyTurn(UObject* WorldContextObject, AActor* BattleController);
 
 	UFUNCTION(BlueprintPure, Category="Melodia|Battle Loop")
@@ -83,7 +87,7 @@ private:
 	static int32 GetIntPropertyValue(AActor* Actor, FName PropertyName, int32 FallbackValue);
 	static void SetIntPropertyValue(AActor* Actor, FName PropertyName, int32 Value);
 	static void SetBoolPropertyValue(AActor* Actor, FName PropertyName, bool bValue);
-	static bool ApplyRhythmBattleAction(UObject* WorldContextObject, AActor* BattleController, float Grade, int32 ComboToWin, bool bSkillAction);
+	static bool ApplyRhythmBattleAction(UObject* WorldContextObject, AActor* BattleController, float Grade, int32 ComboToWin, bool bSkillAction, EMelodiaSpellElement AttackElement = EMelodiaSpellElement::Forte);
 	static void PublishReactiveCommandState(AActor* BattleController, const FString& CommandName, const FString& IntentName, float IntentPower, bool bUltimateWindow, bool bUltimateInterrupt);
 	static void ResolveRhythmVictory(UObject* WorldContextObject, AActor* BattleController, float RemainingHP);
 };

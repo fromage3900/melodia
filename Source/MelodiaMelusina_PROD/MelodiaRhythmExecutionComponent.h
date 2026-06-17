@@ -53,7 +53,7 @@ public:
 	FMelodiaRhythmWindows RhythmWindows;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm Execution")
-	float LeadInBeats = 2.0f;
+	float LeadInBeats = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Rhythm Execution")
 	float ScrollBeatsAhead = 2.5f;
@@ -66,6 +66,9 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm Execution")
 	FMelodiaGeneratedSpell ActiveSpell;
+
+	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm Execution")
+	FName ActiveSkillId = NAME_None;
 
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Rhythm Execution")
 	TArray<FMelodiaHighwayNote> ActiveNotes;
@@ -90,6 +93,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Rhythm Execution")
 	bool BeginSkillExecution();
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Rhythm Execution")
+	bool BeginSkillExecutionById(FName SkillId);
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Rhythm Execution")
 	bool BeginBasicExecution();

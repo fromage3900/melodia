@@ -1,0 +1,23 @@
+{
+  "name": "Grand Cathedral",
+  "description": "Full baroque cathedral with nave, aisles, transept, and apse",
+  "mode": "VALID",
+  "generators": {
+    "cathedral": {
+      "nave_length": 2400,
+      "nave_width": 800,
+      "nave_height": 1800,
+      "aisle_count": 1,
+      "aisle_width": 400,
+      "aisle_height": 1000,
+      "transept_enabled": true,
+      "transept_width": 400,
+      "apse_enabled": true,
+      "apse_radius": 400,
+      "buttresses_enabled": true,
+      "wall_thickness": 30,
+      "golden_proportions": true,
+      "segments": 24
+    }
+  }
+}

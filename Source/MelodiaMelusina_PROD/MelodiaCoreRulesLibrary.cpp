@@ -2,6 +2,7 @@
 
 #include "MelodiaCoreRulesLibrary.h"
 
+#include "MelodiaKeySystemLibrary.h"
 #include "Misc/Crc.h"
 
 namespace MelodiaCoreRules
@@ -187,6 +188,7 @@ FMelodiaGeneratedSpell UMelodiaCoreRulesLibrary::GenerateSpellFromSong(const TAr
 	Spell.Instrument = Instrument;
 	Spell.CompositionHash = MakeCompositionHash(NotePitches, NoteDurations, Instrument, Materials);
 	Spell.SpellId = FName(*FString::Printf(TEXT("Spell_%08X"), static_cast<uint32>(Spell.CompositionHash)));
+	Spell.SpellElement = DeriveSpellElementFromSong(NotePitches, Instrument);
 
 	int32 ActiveNotes = 0;
 	float DurationTotal = 0.0f;
@@ -226,8 +228,9 @@ FMelodiaGeneratedSpell UMelodiaCoreRulesLibrary::GenerateSpellFromSong(const TAr
 	Spell.SPCost = FMath::Clamp(1 + SafeActiveNotes / 5 + RarityTotal / 8, 1, 5);
 	Spell.SecondaryChance = FMath::Clamp(0.05f + static_cast<float>(RarityTotal) * 0.03f, 0.05f, 0.65f);
 	Spell.DebugSummary = FText::Format(
-		NSLOCTEXT("MelodiaSongcraft", "GeneratedSpellSummary", "{0}: Power {1}, Hits {2}, SP {3}"),
+		NSLOCTEXT("MelodiaSongcraft", "GeneratedSpellSummary", "{0} [{1}]: Power {2}, Hits {3}, SP {4}"),
 		FText::FromName(Spell.SpellId),
+		GetElementDisplayName(Spell.SpellElement),
 		FText::AsNumber(Spell.Power),
 		FText::AsNumber(Spell.HitCount),
 		FText::AsNumber(Spell.SPCost)
@@ -251,5 +254,45 @@ float UMelodiaCoreRulesLibrary::GetInstrumentPowerScalar(const EMelodiaInstrumen
 	case EMelodiaInstrument::MusicBox:
 	default:
 		return 1.0f;
+	}
+}
+
+EMelodiaSpellElement UMelodiaCoreRulesLibrary::DeriveSpellElementFromSong(const TArray<int32>& NotePitches, const EMelodiaInstrument Instrument)
+{
+	int32 PitchTotal = 0;
+	int32 ActiveNotes = 0;
+	for (const int32 Pitch : NotePitches)
+	{
+		if (Pitch >= 0)
+		{
+			PitchTotal += Pitch;
+			++ActiveNotes;
+		}
+	}
+
+	const int32 SafeNotes = FMath::Max(1, ActiveNotes);
+	const float AveragePitch = static_cast<float>(PitchTotal) / static_cast<float>(SafeNotes);
+	const int32 InstrumentBias = static_cast<int32>(Instrument);
+	const int32 ElementIndex = (FMath::RoundToInt(AveragePitch) + InstrumentBias * 2) % 7;
+	return static_cast<EMelodiaSpellElement>(FMath::Clamp(ElementIndex, 0, 6));
+}
+
+float UMelodiaCoreRulesLibrary::CalculateElementalDamageMultiplier(const EMelodiaSpellElement AttackElement, const EMelodiaSpellElement DefenseElement, const bool bHasMatchingKey)
+{
+	return UMelodiaKeySystemLibrary::GetElementDamageMultiplier(AttackElement, DefenseElement, bHasMatchingKey);
+}
+
+FText UMelodiaCoreRulesLibrary::GetElementDisplayName(const EMelodiaSpellElement Element)
+{
+	switch (Element)
+	{
+	case EMelodiaSpellElement::Forte:   return NSLOCTEXT("MelodiaElement", "Forte", "Forte");
+	case EMelodiaSpellElement::Tide:    return NSLOCTEXT("MelodiaElement", "Tide", "Tide");
+	case EMelodiaSpellElement::Gale:    return NSLOCTEXT("MelodiaElement", "Gale", "Gale");
+	case EMelodiaSpellElement::Stone:   return NSLOCTEXT("MelodiaElement", "Stone", "Stone");
+	case EMelodiaSpellElement::Radiant: return NSLOCTEXT("MelodiaElement", "Radiant", "Radiant");
+	case EMelodiaSpellElement::Umbral:  return NSLOCTEXT("MelodiaElement", "Umbral", "Umbral");
+	case EMelodiaSpellElement::Arcane:
+	default:                            return NSLOCTEXT("MelodiaElement", "Arcane", "Arcane");
 	}
 }

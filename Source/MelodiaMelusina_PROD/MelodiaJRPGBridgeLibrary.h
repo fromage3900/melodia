@@ -75,7 +75,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Melodia|JRPG Bridge")
 	static void RestorePartyVitals(AActor* BattleController);
 
+	/** Invokes the Phoenix template flee/run flow on the battle controller when available. */
+	UFUNCTION(BlueprintCallable, Category="Melodia|JRPG Bridge")
+	static bool TryFleeBattle(AActor* BattleController);
+
+	/** Removes Phoenix BattleUI / skill dialogs and battle cameras so Melodia native HUD owns presentation. */
+	UFUNCTION(BlueprintCallable, Category="Melodia|JRPG Bridge")
+	static void TeardownPhoenixBattleUI(AActor* BattleController);
+
+	/** Align Phoenix playerUnits[] visibility and vitals with UMelodiaPartySubsystem roster slots. */
+	UFUNCTION(BlueprintCallable, Category="Melodia|JRPG Bridge", meta=(WorldContext="WorldContextObject"))
+	static bool SyncPartyUnitsFromSubsystem(UObject* WorldContextObject, AActor* BattleController);
+
 private:
+	static bool TrySetUnitDisplayName(UObject* Unit, const FText& DisplayName);
 	static bool GetUnitArray(AActor* BattleController, FName ArrayPropertyName, TArray<UObject*>& OutUnits);
 	static UObject* GetCurrentBattleObject(AActor* BattleController);
 	static bool GetUnitArrayFromObject(UObject* SourceObject, FName ArrayPropertyName, TArray<UObject*>& OutUnits);

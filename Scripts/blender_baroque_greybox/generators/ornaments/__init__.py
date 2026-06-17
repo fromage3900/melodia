@@ -1,0 +1,1 @@
+"""Ornament generators package."""

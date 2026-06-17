@@ -18,7 +18,7 @@ struct FPCGContext;
 // ---------------------------------------------------------------------------
 // Settings — artist-editable parameters for the infinite staircase generator.
 // ---------------------------------------------------------------------------
-UCLASS(BlueprintType)
+UCLASS(BlueprintType, EditInlineNew, meta = (DisplayName = "Escher Staircase", Category = "Custom Elements|Escher"))
 class MELODIAMELUSINA_PROD_API UPCGEscherStaircaseSettings : public UPCGSettings
 {
 	GENERATED_BODY()

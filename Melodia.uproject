@@ -215,6 +215,18 @@
 		},
 		{
 			"Name": "UnrealMCP",
+			"Enabled": false
+		},
+		{
+			"Name": "IKRig",
+			"Enabled": true
+		},
+		{
+			"Name": "OSC",
+			"Enabled": true
+		},
+		{
+			"Name": "VRM4U",
 			"Enabled": true
 		}
 	]

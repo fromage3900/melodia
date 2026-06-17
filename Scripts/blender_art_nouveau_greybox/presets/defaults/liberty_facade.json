@@ -1,0 +1,23 @@
+{
+  "generators": {
+    "curved_facade": {
+      "width": 1200,
+      "stories": 2
+    },
+    "butterfly_panel": {
+      "width": 100,
+      "height": 80
+    },
+    "tessellation": {
+      "width": 400,
+      "height": 400
+    },
+    "mosaic_floor": {
+      "width": 400,
+      "height": 400
+    }
+  },
+  "metadata": {
+    "version": "1.0"
+  }
+}
