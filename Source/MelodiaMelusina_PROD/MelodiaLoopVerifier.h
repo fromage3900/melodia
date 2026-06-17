@@ -54,6 +54,7 @@ private:
 	AActor* FindOrSpawnActor(UClass* ActorClass, const FVector& Location) const;
 	bool VerifyMusicClock(FString& Detail);
 	bool VerifyBattleHooks(FString& Detail);
+	bool VerifyEncounterSessionPhases(FString& Detail);
 	bool VerifyHUDHooks(FString& Detail);
 	bool VerifyQuestHook(FString& Detail);
 	bool VerifyRhythmManagerWiring(FString& Detail);

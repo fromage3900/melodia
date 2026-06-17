@@ -46,11 +46,11 @@ public:
 
 	/** Player must walk at least this far from the arm position before the gate can fire. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Encounter", meta=(ClampMin="0"))
-	float MinPlayerTravelToActivate = 200.0f;
+	float MinPlayerTravelToActivate = 50.0f;
 
 	/** When true, overlap only counts after the player has left the trigger once since arming. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Encounter")
-	bool bRequireReEntryAfterArm = true;
+	bool bRequireReEntryAfterArm = false;
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Encounter")
 	bool StartEncounter(AActor* InstigatorActor = nullptr);

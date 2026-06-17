@@ -4,6 +4,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/PlayerController.h"
 #include "MelodiaPartySubsystem.h"
 #include "UObject/UnrealType.h"
 
@@ -104,7 +105,7 @@ void ClearObjectPropertyIfPresent(UObject* Container, FProperty* Property)
 	}
 }
 
-void TeardownUIPropertiesOnObject(UObject* Container)
+void TeardownUIPropertiesOnObject(UObject* Container, const EMelodiaPhoenixTeardownScope Scope)
 {
 	if (!Container)
 	{
@@ -133,12 +134,119 @@ void TeardownUIPropertiesOnObject(UObject* Container)
 			continue;
 		}
 
-		if (PropertyName.Contains(TEXT("Camera"), ESearchCase::IgnoreCase)
+		if (Scope == EMelodiaPhoenixTeardownScope::Full
+			&& PropertyName.Contains(TEXT("Camera"), ESearchCase::IgnoreCase)
 			&& !PropertyName.Contains(TEXT("Component"), ESearchCase::IgnoreCase))
 		{
 			HideBattleCameraActor(Value);
 		}
 	}
+}
+
+AActor* FindPhoenixBattleCameraActor(AActor* BattleController)
+{
+	if (!BattleController)
+	{
+		return nullptr;
+	}
+
+	auto ResolveNamedCamera = [](UObject* Container, const FName PropertyName) -> AActor*
+	{
+		if (!Container)
+		{
+			return nullptr;
+		}
+
+		if (const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(
+			Container->GetClass()->FindPropertyByName(PropertyName)))
+		{
+			return Cast<AActor>(ObjectProperty->GetObjectPropertyValue_InContainer(Container));
+		}
+
+		return nullptr;
+	};
+
+	auto ScanContainer = [](UObject* Container) -> AActor*
+	{
+		if (!Container)
+		{
+			return nullptr;
+		}
+
+		for (TFieldIterator<FProperty> It(Container->GetClass()); It; ++It)
+		{
+			FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(*It);
+			if (!ObjectProperty)
+			{
+				continue;
+			}
+
+			const FString PropertyName = ObjectProperty->GetName();
+			if (!PropertyName.Contains(TEXT("Camera"), ESearchCase::IgnoreCase)
+				|| PropertyName.Contains(TEXT("Component"), ESearchCase::IgnoreCase))
+			{
+				continue;
+			}
+
+			if (AActor* CameraActor = Cast<AActor>(ObjectProperty->GetObjectPropertyValue_InContainer(Container)))
+			{
+				if (!CameraActor->IsHidden())
+				{
+					return CameraActor;
+				}
+			}
+		}
+
+		return nullptr;
+	};
+
+	const FName PreferredCameraProps[] = {
+		TEXT("staticCamera"),
+		TEXT("dynamicCamera"),
+		TEXT("StaticCamera"),
+		TEXT("DynamicCamera"),
+	};
+
+	for (const FName PropertyName : PreferredCameraProps)
+	{
+		if (AActor* Camera = ResolveNamedCamera(BattleController, PropertyName))
+		{
+			return Camera;
+		}
+	}
+
+	if (UObject* CurrentBattle = [&BattleController]() -> UObject*
+	{
+		const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(
+			BattleController->GetClass()->FindPropertyByName(CurrentBattleName));
+		return ObjectProperty ? ObjectProperty->GetObjectPropertyValue_InContainer(BattleController) : nullptr;
+	}())
+	{
+		for (const FName PropertyName : PreferredCameraProps)
+		{
+			if (AActor* Camera = ResolveNamedCamera(CurrentBattle, PropertyName))
+			{
+				return Camera;
+			}
+		}
+	}
+
+	if (AActor* Camera = ScanContainer(BattleController))
+	{
+		return Camera;
+	}
+
+	if (UObject* CurrentBattle = [&BattleController]() -> UObject*
+	{
+		const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(
+			BattleController->GetClass()->FindPropertyByName(CurrentBattleName));
+		return ObjectProperty ? ObjectProperty->GetObjectPropertyValue_InContainer(BattleController) : nullptr;
+	}())
+	{
+		return ScanContainer(CurrentBattle);
+	}
+
+	return nullptr;
 }
 
 void SetControllerBattleFlag(AActor* BattleController, const FName PropertyName, const bool bValue)
@@ -702,17 +810,41 @@ bool UMelodiaJRPGBridgeLibrary::TryFleeBattle(AActor* BattleController)
 	return false;
 }
 
-void UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(AActor* BattleController)
+void UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(AActor* BattleController, const EMelodiaPhoenixTeardownScope Scope)
 {
 	if (!BattleController)
 	{
 		return;
 	}
 
-	TeardownUIPropertiesOnObject(BattleController);
+	TeardownUIPropertiesOnObject(BattleController, Scope);
 	if (UObject* CurrentBattle = GetCurrentBattleObject(BattleController))
 	{
-		TeardownUIPropertiesOnObject(CurrentBattle);
+		TeardownUIPropertiesOnObject(CurrentBattle, Scope);
+	}
+
+	if (Scope == EMelodiaPhoenixTeardownScope::WidgetsOnly)
+	{
+		const FName WidgetTeardownFunctions[] = {
+			TEXT("CloseSkillDialogue"),
+			TEXT("HideBattleUI"),
+			TEXT("RemoveBattleUI"),
+			TEXT("CloseBattleUI"),
+		};
+
+		for (const FName FunctionName : WidgetTeardownFunctions)
+		{
+			if (UFunction* Function = BattleController->FindFunction(FunctionName))
+			{
+				BattleController->ProcessEvent(Function, nullptr);
+			}
+		}
+
+		SetControllerBattleFlag(BattleController, TEXT("isInBattle"), true);
+		SetControllerBattleFlag(BattleController, TEXT("bIsInBattle"), true);
+		SetControllerBattleFlag(BattleController, TEXT("inBattle"), true);
+		UE_LOG(LogTemp, Log, TEXT("Melodia JRPG bridge stripped Phoenix widgets on %s (units + camera kept)."), *BattleController->GetName());
+		return;
 	}
 
 	const FName TeardownFunctions[] = {
@@ -737,7 +869,94 @@ void UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(AActor* BattleController
 	SetControllerBattleFlag(BattleController, TEXT("bIsInBattle"), false);
 	SetControllerBattleFlag(BattleController, TEXT("inBattle"), false);
 
-	UE_LOG(LogTemp, Log, TEXT("Melodia JRPG bridge tore down Phoenix battle UI on %s."), *BattleController->GetName());
+	UE_LOG(LogTemp, Log, TEXT("Melodia JRPG bridge tore down Phoenix battle presentation on %s."), *BattleController->GetName());
+}
+
+void UMelodiaJRPGBridgeLibrary::EnsurePhoenixBattleUnitsVisible(AActor* BattleController)
+{
+	if (!BattleController)
+	{
+		return;
+	}
+
+	TArray<UObject*> Enemies;
+	TArray<UObject*> Party;
+	GetUnitArray(BattleController, EnemyArrayName, Enemies);
+	GetUnitArray(BattleController, PartyArrayName, Party);
+
+	for (UObject* Unit : Enemies)
+	{
+		if (AActor* UnitActor = Cast<AActor>(Unit))
+		{
+			UnitActor->SetActorHiddenInGame(false);
+			UnitActor->SetActorEnableCollision(true);
+		}
+	}
+
+	for (UObject* Unit : Party)
+	{
+		if (!Unit)
+		{
+			continue;
+		}
+
+		if (AActor* UnitActor = Cast<AActor>(Unit))
+		{
+			UnitActor->SetActorHiddenInGame(false);
+			UnitActor->SetActorEnableCollision(true);
+		}
+	}
+}
+
+bool UMelodiaJRPGBridgeLibrary::ApplyPhoenixBattleCameraView(APlayerController* PlayerController, AActor* BattleController)
+{
+	if (!PlayerController || !BattleController)
+	{
+		return false;
+	}
+
+	const FName CameraFunctions[] = {
+		TEXT("SwitchToStaticCamera"),
+		TEXT("SwitchToFrontCamera"),
+		TEXT("AdjustCamera"),
+		TEXT("SwitchToBattleCamera"),
+		TEXT("SetBattleCamera"),
+		TEXT("ShowBattleCamera"),
+		TEXT("ActivateBattleCamera"),
+		TEXT("FocusBattleCamera"),
+	};
+
+	for (const FName FunctionName : CameraFunctions)
+	{
+		if (UFunction* Function = BattleController->FindFunction(FunctionName))
+		{
+			BattleController->ProcessEvent(Function, nullptr);
+			if (AActor* CameraActor = FindPhoenixBattleCameraActor(BattleController))
+			{
+				CameraActor->SetActorHiddenInGame(false);
+				PlayerController->SetViewTargetWithBlend(CameraActor, 0.35f);
+			}
+			else
+			{
+				PlayerController->SetViewTargetWithBlend(BattleController, 0.35f);
+			}
+			UE_LOG(LogTemp, Log, TEXT("Melodia JRPG bridge applied battle camera via %s."), *FunctionName.ToString());
+			return true;
+		}
+	}
+
+	if (AActor* CameraActor = FindPhoenixBattleCameraActor(BattleController))
+	{
+		CameraActor->SetActorHiddenInGame(false);
+		CameraActor->SetActorTickEnabled(true);
+		PlayerController->SetViewTargetWithBlend(CameraActor, 0.35f);
+		UE_LOG(LogTemp, Log, TEXT("Melodia JRPG bridge set view target to %s."), *CameraActor->GetName());
+		return true;
+	}
+
+	PlayerController->SetViewTargetWithBlend(BattleController, 0.35f);
+	UE_LOG(LogTemp, Log, TEXT("Melodia JRPG bridge fell back to battle controller view target."));
+	return true;
 }
 
 bool UMelodiaJRPGBridgeLibrary::TrySetUnitDisplayName(UObject* Unit, const FText& DisplayName)

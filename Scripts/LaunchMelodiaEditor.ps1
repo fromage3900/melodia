@@ -1,16 +1,38 @@
 # Single-instance Melodia editor launcher (bypasses Epic VersionSelector double-open issues).
 param(
-    [string]$ProjectPath = "G:\Melodia\Melodia.uproject"
+    [string]$ProjectPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 
-$EngineExe = "G:\MooaToon-main\MooaToon-main\MooaToon-Engine-Precompiled\Windows\Engine\Binaries\Win64\UnrealEditor.exe"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$LocalPathsFile = Join-Path $ScriptDir "local-paths.ps1"
+if (Test-Path $LocalPathsFile) {
+    . $LocalPathsFile
+    Write-Host "Loaded local paths from $LocalPathsFile"
+}
+
+if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
+    if ($MelodiaProjectPath) {
+        $ProjectPath = $MelodiaProjectPath
+    }
+    else {
+        $ProjectPath = (Join-Path (Split-Path -Parent $ScriptDir) "Melodia.uproject")
+    }
+}
+
+if ($MelodiaEngineExe) {
+    $EngineExe = $MelodiaEngineExe
+}
+else {
+    $EngineExe = "G:\MooaToon-main\MooaToon-main\MooaToon-Engine-Precompiled\Windows\Engine\Binaries\Win64\UnrealEditor.exe"
+}
+
 $MutexName = "Global\MelodiaEditorSingleInstance_9c5d3a24"
 $LaunchGuardSeconds = 90
 
 if (-not (Test-Path $EngineExe)) {
-    Write-Error "MooaToon UnrealEditor not found: $EngineExe"
+    Write-Error "MooaToon UnrealEditor not found: $EngineExe`nCopy Scripts/local-paths.ps1.example to Scripts/local-paths.ps1 and set MelodiaEngineExe."
     exit 1
 }
 

@@ -116,9 +116,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	bool bEnableLegacyRhythmTestManager = false;
 
-	/** When true, strips Phoenix BattleUI after encounter init (Melodia-only HUD). False = Option B: keep Phoenix menus for you to replace. */
+	/** When true, strips Phoenix BattleUI after encounter init (Melodia native HUD owns battle). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Battle")
-	bool bSuppressPhoenixBattleUI = false;
+	bool bSuppressPhoenixBattleUI = true;
+
+	/** Strategy B: keep Phoenix unit meshes + battle camera; Melodia HUD owns commands/vitals. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Battle")
+	bool bKeepPhoenixBattlePresentation = true;
+
+	/** HSR-style: SP/Break/weakness/Ult turn flow with instant skill resolution. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Battle")
+	bool bHSRStyleBattle = true;
+
+	/** When true, skills open the rhythm note highway. Off = traditional turn-based skill. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Battle")
+	bool bUseRhythmHighway = false;
 
 	/** When true, place encounters/rest/portal from PCG walkable data instead of hardcoded offsets. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|PCG")
@@ -211,6 +223,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Presentation")
 	FString LastCosmeticPresetText;
 
+	UFUNCTION(BlueprintPure, Category="Melodia|Presentation")
+	UMelodiaRhythmHUDWidget* GetRhythmHUDWidget() const { return ActiveRhythmHUDWidget; }
+
+	UFUNCTION(BlueprintCallable, Category="Melodia|Presentation")
+	UMelodiaRhythmHUDWidget* EnsureActiveRhythmHUD();
+
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Presentation")
 	TObjectPtr<UMelodiaRhythmHUDWidget> ActiveRhythmHUDWidget;
 
@@ -226,6 +244,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Battle Input")
 	bool bBattleInputBound = false;
 
+	/** Temporary mode: use Phoenix template turn-based battle only (no Melodia rhythm/session). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melodia|Battle")
+	bool bJRPGOnlyMode = false;
+
 	UFUNCTION(BlueprintCallable, Category="Melodia|Loop")
 	void SetLoopPhase(EMelodiaLoopPhase NewPhase);
 
@@ -237,6 +259,8 @@ public:
 	void NotifyBattleSessionBegan(AActor* BattleController);
 
 protected:
+	virtual void Tick(float DeltaSeconds) override;
+
 	UPROPERTY(BlueprintReadOnly, Category="Melodia|Loop")
 	TObjectPtr<AMelodiaMusicManager> ActiveMusicManager;
 

@@ -14,6 +14,7 @@
 #include "MelodiaContentRegistrySubsystem.h"
 #include "MelodiaMechanicProgressionSubsystem.h"
 #include "MelodiaJRPGBridgeLibrary.h"
+#include "MelodiaJRPGPresenter.h"
 #include "MelodiaPCGLibrary.h"
 #include "MelodiaQuestManagerBase.h"
 #include "MelodiaRhythmGameModeBase.h"
@@ -125,11 +126,15 @@ bool AMelodiaEncounterTrigger::StartEncounter(AActor* InstigatorActor)
 		return false;
 	}
 
-	AActor* BattleData = FindOrSpawnBattleData();
-	if (!BattleData)
+	AActor* BattleData = nullptr;
+	if (!GameMode || !GameMode->bJRPGOnlyMode)
 	{
-		bLastActivationStartedBattle = false;
-		return false;
+		BattleData = FindOrSpawnBattleData();
+		if (!BattleData)
+		{
+			bLastActivationStartedBattle = false;
+			return false;
+		}
 	}
 
 	++ActivationCount;
@@ -151,25 +156,35 @@ bool AMelodiaEncounterTrigger::StartEncounter(AActor* InstigatorActor)
 		{
 			if (const UMelodiaEncounterDataAsset* EncounterAsset = Registry->GetDefaultEncounter())
 			{
-				Encounter.EncounterLevel = EncounterAsset->EncounterLevel > 0
-					? EncounterAsset->EncounterLevel
-					: Encounter.EncounterLevel;
+				if (EncounterAsset->EncounterLevel > 0)
+				{
+					Encounter.EncounterLevel = FMath::Max(Encounter.EncounterLevel, EncounterAsset->EncounterLevel);
+				}
 				Encounter.EncounterDisplayName = EncounterAsset->DisplayName;
 			}
 		}
 	}
 
-	const bool bSuppressPhoenixUI = GameMode ? GameMode->bSuppressPhoenixBattleUI : false;
-	UMelodiaBattleSession* Session = UMelodiaBattleSession::Get(this);
-	if (!Session || !Session->BeginEncounter(Encounter, bSuppressPhoenixUI))
+	// Temporary mode: Phoenix template turn-based battle only (no Melodia rhythm/session).
+	if (GameMode && GameMode->bJRPGOnlyMode)
 	{
-		bLastActivationStartedBattle = false;
-		return false;
+		UMelodiaJRPGPresenter::InitializeEncounter(this, Encounter, false);
+	}
+	else
+	{
+		const bool bSuppressPhoenixUI = GameMode ? GameMode->bSuppressPhoenixBattleUI : false;
+		UMelodiaBattleSession* Session = UMelodiaBattleSession::Get(this);
+		if (!Session || !Session->BeginEncounter(Encounter, bSuppressPhoenixUI))
+		{
+			bLastActivationStartedBattle = false;
+			return false;
+		}
 	}
 
 	if (GameMode)
 	{
 		GameMode->NotifyBattleSessionBegan(BattleController);
+		GameMode->SetLoopPhase(EMelodiaLoopPhase::Battle);
 	}
 
 	for (TActorIterator<AMelodiaQuestManagerBase> QuestIt(GetWorld()); QuestIt; ++QuestIt)

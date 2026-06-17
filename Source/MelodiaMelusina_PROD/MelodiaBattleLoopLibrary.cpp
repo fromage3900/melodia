@@ -6,6 +6,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
+#include "MelodiaBattleSession.h"
 #include "MelodiaCombatStateComponent.h"
 #include "MelodiaCombatSyncLibrary.h"
 #include "MelodiaCompanionActor.h"
@@ -18,6 +19,7 @@
 #include "MelodiaRhythmGameModeBase.h"
 #include "MelodiaRhythmHUDWidget.h"
 #include "MelodiaRhythmExecutionComponent.h"
+#include "MelodiaSongSkillLibrary.h"
 #include "UObject/UObjectIterator.h"
 
 const FName UMelodiaBattleLoopLibrary::RhythmVictoryResolvedTag = TEXT("MelodiaRhythmVictoryResolved");
@@ -63,7 +65,7 @@ void CleanupBattlePresentation(AActor* BattleController)
 		}
 	}
 
-	UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(BattleController);
+	UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(BattleController, EMelodiaPhoenixTeardownScope::Full);
 	BattleController->SetActorHiddenInGame(true);
 	BattleController->SetActorEnableCollision(false);
 }
@@ -114,6 +116,32 @@ bool UMelodiaBattleLoopLibrary::ApplyRhythmBattleHit(UObject* WorldContextObject
 
 bool UMelodiaBattleLoopLibrary::ApplyRhythmSkillAction(UObject* WorldContextObject, AActor* BattleController, const float Grade, const int32 ComboToWin)
 {
+	if (BattleController)
+	{
+		FName SkillId = NAME_None;
+		if (const UWorld* World = BattleController->GetWorld())
+		{
+			if (const UGameInstance* GI = World->GetGameInstance())
+			{
+				if (const UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+				{
+					SkillId = Progression->State.ActiveSkillId;
+				}
+			}
+		}
+
+		if (SkillId.IsNone())
+		{
+			SkillId = UMelodiaSongSkillLibrary::ResolveSkillIdForMechanicLevel(WorldContextObject, 1);
+		}
+
+		FMelodiaSongSkillRecipe Recipe;
+		if (!SkillId.IsNone() && UMelodiaSongSkillLibrary::ResolveSongSkill(WorldContextObject, SkillId, Recipe))
+		{
+			return ExecuteInstantSkillRecipe(WorldContextObject, BattleController, Recipe, Grade);
+		}
+	}
+
 	return ApplyRhythmBattleAction(WorldContextObject, BattleController, Grade, ComboToWin, true);
 }
 
@@ -131,7 +159,28 @@ bool UMelodiaBattleLoopLibrary::ExecuteRhythmBattleCommand(UObject* WorldContext
 	}
 }
 
-bool UMelodiaBattleLoopLibrary::ApplyRhythmBattleAction(UObject* WorldContextObject, AActor* BattleController, const float Grade, const int32 ComboToWin, const bool bSkillAction, const EMelodiaSpellElement AttackElement)
+bool UMelodiaBattleLoopLibrary::ExecuteInstantSkillRecipe(UObject* WorldContextObject, AActor* BattleController, const FMelodiaSongSkillRecipe& Recipe, const float Grade)
+{
+	if (!BattleController || Recipe.SkillId.IsNone())
+	{
+		return false;
+	}
+
+	const int32 SkillCost = Recipe.SPCostOverride > 0 ? Recipe.SPCostOverride : 1;
+	const float SkillGrade = FMath::Clamp(Grade, 0.35f, 1.5f) * FMath::Max(0.5f, Recipe.PowerScalar);
+
+	if (UWorld* World = BattleController->GetWorld())
+	{
+		ForEachRhythmHUD(World, [&Recipe](UMelodiaRhythmHUDWidget& Widget)
+		{
+			Widget.ShowActionPrompt(FString::Printf(TEXT("Skill: %s"), *Recipe.DisplayName.ToString()));
+		});
+	}
+
+	return ApplyRhythmBattleAction(WorldContextObject, BattleController, SkillGrade, 3, true, Recipe.Element, SkillCost, Recipe.PowerScalar);
+}
+
+bool UMelodiaBattleLoopLibrary::ApplyRhythmBattleAction(UObject* WorldContextObject, AActor* BattleController, const float Grade, const int32 ComboToWin, const bool bSkillAction, const EMelodiaSpellElement AttackElement, const int32 SkillCost, const float SkillScalar)
 {
 	if (!BattleController)
 	{
@@ -168,8 +217,8 @@ bool UMelodiaBattleLoopLibrary::ApplyRhythmBattleAction(UObject* WorldContextObj
 
 	if (bSkillAction)
 	{
-		constexpr int32 SkillCost = 1;
-		const bool bCanSpend = CombatState ? CombatState->SpendSkillPoints(SkillCost) : NewSkillPoints >= SkillCost;
+		const int32 EffectiveSkillCost = FMath::Max(1, SkillCost);
+		const bool bCanSpend = CombatState ? CombatState->SpendSkillPoints(EffectiveSkillCost) : NewSkillPoints >= EffectiveSkillCost;
 		if (!bCanSpend)
 		{
 			if (UWorld* World = BattleController->GetWorld())
@@ -192,8 +241,8 @@ bool UMelodiaBattleLoopLibrary::ApplyRhythmBattleAction(UObject* WorldContextObj
 		}
 		else
 		{
-			--NewSkillPoints;
-			SkillPointDelta = -SkillCost;
+			NewSkillPoints -= EffectiveSkillCost;
+			SkillPointDelta = -EffectiveSkillCost;
 			++SkillActionCount;
 		}
 	}
@@ -269,7 +318,8 @@ bool UMelodiaBattleLoopLibrary::ApplyRhythmBattleAction(UObject* WorldContextObj
 	const float ElementMultiplier = bSkillAction
 		? UMelodiaCoreRulesLibrary::CalculateElementalDamageMultiplier(AttackElement, DefenseElement, bHasMatchingKey)
 		: 1.0f;
-	const float RawDamage = FMath::Max(1.0f, BaseDamage * FMath::Max(0.0f, Grade) * ActionScalar * ElementMultiplier);
+	const float PowerBoost = bSkillAction ? FMath::Max(0.35f, SkillScalar) : 1.0f;
+	const float RawDamage = FMath::Max(1.0f, BaseDamage * FMath::Max(0.0f, Grade) * ActionScalar * ElementMultiplier * PowerBoost);
 	const bool bHadBreakFollowUp = CombatState && CombatState->bBreakFollowUpAvailable && !CombatState->bBreakFollowUpConsumed;
 	const float FollowUpBonusDamage = bHadBreakFollowUp ? FMath::Max(1.0f, RawDamage * 0.70f) : 0.0f;
 	if (CombatState && bHadBreakFollowUp)
@@ -423,7 +473,7 @@ bool UMelodiaBattleLoopLibrary::ApplyRhythmBattleAction(UObject* WorldContextObj
 	{
 		UE_LOG(LogTemp, Log, TEXT("Melodia rhythm battle hit dealt %.1f damage, enemy HP %.1f/%.1f."), Damage, RemainingHP, MaxHP);
 		ExecuteEnemyTurn(WorldContextObject, BattleController);
-		return false;
+		return true;
 	}
 
 	ResolveRhythmVictory(WorldContextObject, BattleController, RemainingHP);
@@ -617,10 +667,6 @@ bool UMelodiaBattleLoopLibrary::ExecuteEnemyTurn(UObject* WorldContextObject, AA
 		}
 	}
 
-	SetFloatPropertyValue(BattleController, TEXT("RhythmPartyHP"), CombatState->PartyHP);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmPartyMaxHP"), CombatState->PartyMaxHP);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmLastPartyDamage"), PartyDamage);
-
 	PublishReactiveCommandState(BattleController, TEXT("Enemy Turn"), TEXT("Slime Strike"), IntentPower, false, false);
 
 	if (UWorld* World = BattleController->GetWorld())
@@ -638,25 +684,23 @@ bool UMelodiaBattleLoopLibrary::ExecuteEnemyTurn(UObject* WorldContextObject, AA
 
 	if (IsPartyDefeated(BattleController))
 	{
-		if (UMelodiaCombatStateComponent* DefeatState = FindOrCreateCombatState(BattleController))
-		{
-			DefeatState->PartyHP = DefeatState->PartyMaxHP;
-			DefeatState->LastPartyDamageTaken = 0.0f;
-			SetFloatPropertyValue(BattleController, TEXT("RhythmPartyHP"), DefeatState->PartyHP);
-			SetFloatPropertyValue(BattleController, TEXT("RhythmLastPartyDamage"), 0.0f);
-		}
-		UMelodiaJRPGBridgeLibrary::RestorePartyVitals(BattleController);
-		CleanupBattlePresentation(BattleController);
-		PublishLoopPhase(BattleController->GetWorld(), EMelodiaLoopPhase::ExplorationReady);
 		if (UWorld* DefeatWorld = BattleController->GetWorld())
 		{
 			ForEachRhythmHUD(DefeatWorld, [](UMelodiaRhythmHUDWidget& Widget)
 			{
 				Widget.SetBattlePhaseBanner(TEXT("Defeat"));
-				Widget.ShowBattleStatus(TEXT("Defeat — back to explore"));
-				Widget.ShowActionPrompt(TEXT("WASD to move | walk to song gate to retry"));
+				Widget.ShowBattleStatus(TEXT("Party defeated"));
+				Widget.ShowActionPrompt(TEXT("Returning to explore..."));
 			});
+
+			if (UMelodiaBattleSession* Session = UMelodiaBattleSession::Get(DefeatWorld))
+			{
+				Session->EndEncounter(EMelodiaEncounterResult::Defeat);
+				return true;
+			}
 		}
+
+		UMelodiaJRPGBridgeLibrary::RestorePartyVitals(BattleController);
 		return true;
 	}
 
@@ -670,7 +714,7 @@ bool UMelodiaBattleLoopLibrary::ExecuteEnemyTurn(UObject* WorldContextObject, AA
 		ForEachRhythmHUD(World, [](UMelodiaRhythmHUDWidget& Widget)
 		{
 			Widget.SetBattlePhaseBanner(TEXT("Player Turn"));
-			Widget.ShowActionPrompt(TEXT("Tap Space/1 ON BEAT | 2=Skill highway | R=Ultimate"));
+			Widget.ShowActionPrompt(TEXT("Your turn | 1=Attack | 2=Skill | R=Ultimate | Tab=cycle skill"));
 		});
 	}
 
@@ -705,8 +749,6 @@ bool UMelodiaBattleLoopLibrary::TriggerRhythmUltimate(UObject* WorldContextObjec
 	const float BaseDamage = FMath::Max(1.0f, GetFloatPropertyValue(BattleController, TEXT("RhythmBaseDamage"), 10.0f));
 	const float UltimateDamage = FMath::Max(BaseDamage * 3.0f, MaxHP * 0.75f);
 	float RemainingHP = FMath::Max(0.0f, CurrentHP - UltimateDamage);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmLastDamage"), UltimateDamage);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmLastUltimateDamage"), UltimateDamage);
 	// Bridge: mirror ultimate damage onto the real JRPG enemy unit(s).
 	if (UMelodiaJRPGBridgeLibrary::HasJRPGUnits(BattleController))
 	{
@@ -716,7 +758,7 @@ bool UMelodiaBattleLoopLibrary::TriggerRhythmUltimate(UObject* WorldContextObjec
 			RemainingHP = SyncedEnemyHP;
 		}
 	}
-	SetFloatPropertyValue(BattleController, TEXT("RhythmEnemyHP"), RemainingHP);
+
 	UMelodiaCombatStateComponent* CombatState = FindOrCreateCombatState(BattleController);
 	if (CombatState)
 	{
@@ -730,33 +772,41 @@ bool UMelodiaBattleLoopLibrary::TriggerRhythmUltimate(UObject* WorldContextObjec
 				QuestManager.NotifyEnemyBroken();
 			});
 		}
+
+		FMelodiaCombatLegacyOverrides Overrides;
+		Overrides.bOverrideLastDamage = true;
+		Overrides.LastDamage = UltimateDamage;
+		Overrides.bOverrideLastUltimateDamage = true;
+		Overrides.LastUltimateDamage = UltimateDamage;
+		Overrides.bOverrideEnemyHP = true;
+		Overrides.EnemyHP = RemainingHP;
+		Overrides.bOverrideEnemyMaxHP = true;
+		Overrides.EnemyMaxHP = MaxHP;
+		Overrides.bOverrideLastToughnessDamage = true;
+		Overrides.LastToughnessDamage = CombatState->EnemyToughnessMax;
+		Overrides.bOverrideLastFollowUpBonusDamage = true;
+		Overrides.LastFollowUpBonusDamage = 0.0f;
+		UMelodiaCombatSyncLibrary::MirrorCombatStateToLegacyProperties(BattleController, CombatState, Overrides);
 	}
+	else
+	{
+		SetFloatPropertyValue(BattleController, TEXT("RhythmLastDamage"), UltimateDamage);
+		SetFloatPropertyValue(BattleController, TEXT("RhythmLastUltimateDamage"), UltimateDamage);
+		SetFloatPropertyValue(BattleController, TEXT("RhythmEnemyHP"), RemainingHP);
+		SetFloatPropertyValue(BattleController, TEXT("RhythmUltimateGauge"), 0.0f);
+		SetBoolPropertyValue(BattleController, TEXT("bRhythmUltimateReady"), false);
+		SetIntPropertyValue(BattleController, TEXT("RhythmUltimateActivationCount"), GetIntPropertyValue(BattleController, TEXT("RhythmUltimateActivationCount"), 0) + 1);
+	}
+
+	BattleController->Tags.Remove(RhythmUltimateReadyTag);
+	PublishReactiveCommandState(BattleController, TEXT("Ultimate"), TEXT("Interrupted"), UltimateDamage, false, true);
+
 	const float EnemyToughness = CombatState ? CombatState->EnemyToughness : 0.0f;
 	const float EnemyToughnessMax = CombatState ? FMath::Max(1.0f, CombatState->EnemyToughnessMax) : 100.0f;
 	const bool bEnemyBroken = CombatState && CombatState->bEnemyBroken;
 	const bool bBreakFollowUpAvailable = CombatState && CombatState->bBreakFollowUpAvailable && !CombatState->bBreakFollowUpConsumed;
 	const int32 EnemyTurnDelayStacks = CombatState ? CombatState->EnemyTurnDelayStacks : 2;
 	const int32 LastEnemyTurnDelay = CombatState ? CombatState->LastEnemyTurnDelay : 2;
-	SetFloatPropertyValue(BattleController, TEXT("RhythmEnemyToughness"), EnemyToughness);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmEnemyToughnessMax"), EnemyToughnessMax);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmLastToughnessDamage"), EnemyToughnessMax);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmLastFollowUpBonusDamage"), 0.0f);
-	SetBoolPropertyValue(BattleController, TEXT("bRhythmEnemyBroken"), bEnemyBroken);
-	SetBoolPropertyValue(BattleController, TEXT("bRhythmBreakFollowUpAvailable"), bBreakFollowUpAvailable);
-	SetBoolPropertyValue(BattleController, TEXT("bRhythmBreakFollowUpConsumed"), false);
-	SetIntPropertyValue(BattleController, TEXT("RhythmEnemyBreakCount"), CombatState ? CombatState->EnemyBreakCount : 1);
-	SetIntPropertyValue(BattleController, TEXT("RhythmTotalEnemyBreakCount"), CombatState ? CombatState->TotalEnemyBreakCount : 1);
-	SetIntPropertyValue(BattleController, TEXT("RhythmBreakFollowUpAvailableCount"), CombatState ? CombatState->BreakFollowUpAvailableCount : 1);
-	SetIntPropertyValue(BattleController, TEXT("RhythmBreakFollowUpConsumedCount"), CombatState ? CombatState->BreakFollowUpConsumedCount : 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmEnemyTurnDelayStacks"), EnemyTurnDelayStacks);
-	SetIntPropertyValue(BattleController, TEXT("RhythmLastEnemyTurnDelay"), LastEnemyTurnDelay);
-	SetIntPropertyValue(BattleController, TEXT("RhythmEnemyTurnDelayApplyCount"), CombatState ? CombatState->EnemyTurnDelayApplyCount : 1);
-
-	SetFloatPropertyValue(BattleController, TEXT("RhythmUltimateGauge"), 0.0f);
-	SetBoolPropertyValue(BattleController, TEXT("bRhythmUltimateReady"), false);
-	SetIntPropertyValue(BattleController, TEXT("RhythmUltimateActivationCount"), CombatState ? CombatState->UltimateActivationCount : GetIntPropertyValue(BattleController, TEXT("RhythmUltimateActivationCount"), 0) + 1);
-	BattleController->Tags.Remove(RhythmUltimateReadyTag);
-	PublishReactiveCommandState(BattleController, TEXT("Ultimate"), TEXT("Interrupted"), UltimateDamage, false, true);
 
 	if (UWorld* World = BattleController->GetWorld())
 	{
@@ -784,11 +834,15 @@ bool UMelodiaBattleLoopLibrary::TriggerRhythmUltimate(UObject* WorldContextObjec
 	{
 		ResolveRhythmVictory(WorldContextObject, BattleController, RemainingHP);
 	}
+	else
+	{
+		ExecuteEnemyTurn(WorldContextObject, BattleController);
+	}
 
 	return true;
 }
 
-void UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(AActor* BattleController)
+void UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(AActor* BattleController, const int32 OverrideEncounterLevel)
 {
 	if (!BattleController)
 	{
@@ -796,11 +850,20 @@ void UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(AActor* BattleControl
 	}
 
 	const float MaxHP = FMath::Max(1.0f, GetFloatPropertyValue(BattleController, TEXT("RhythmEnemyMaxHP"), 45.0f));
-	SetFloatPropertyValue(BattleController, TEXT("RhythmEnemyHP"), MaxHP);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmLastDamage"), 0.0f);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmLastUltimateDamage"), 0.0f);
 	SetFloatPropertyValue(BattleController, TEXT("CurrentRhythmMultiplier"), 1.0f);
 	UMelodiaCombatStateComponent* CombatState = FindOrCreateCombatState(BattleController);
+	int32 EncounterLevel = 1;
+	if (OverrideEncounterLevel > 0)
+	{
+		EncounterLevel = FMath::Clamp(OverrideEncounterLevel, 1, 30);
+	}
+	else if (UGameInstance* LevelGI = BattleController->GetGameInstance())
+	{
+		if (const UMelodiaMechanicProgressionSubsystem* Progression = LevelGI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+		{
+			EncounterLevel = FMath::Clamp(Progression->GetMechanicLevel(), 1, 30);
+		}
+	}
 	if (CombatState)
 	{
 		CombatState->ResetUltimateGauge();
@@ -809,17 +872,19 @@ void UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(AActor* BattleControl
 		CombatState->LastPartyDamageTaken = 0.0f;
 		CombatState->EnemyTurnCount = 0;
 
-		int32 EncounterLevel = 1;
 		UGameInstance* GI = BattleController->GetGameInstance();
 		if (GI)
 		{
 			if (const UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
 			{
-				EncounterLevel = Progression->GetMechanicLevel();
 				CombatState->EquippedKeyElement = Progression->State.EquippedKeyElement;
 				CombatState->bCompanionActive = Progression->State.bCompanionUnlocked;
 			}
 		}
+		const float LevelScale = 1.0f + static_cast<float>(EncounterLevel - 1) * 0.075f;
+		CombatState->EnemyToughnessMax = 80.0f + EncounterLevel * 5.0f;
+		CombatState->EnemyToughness = CombatState->EnemyToughnessMax;
+		CombatState->EnemyIntentPower = 4.5f + EncounterLevel * 1.25f;
 		CombatState->EnemyElement = UMelodiaKeySystemLibrary::GetEnemyElementForEncounterLevel(EncounterLevel);
 
 		if (UMelodiaPartySubsystem* Party = GI ? GI->GetSubsystem<UMelodiaPartySubsystem>() : nullptr)
@@ -839,46 +904,72 @@ void UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(AActor* BattleControl
 				}
 			}
 		}
-
-		SetFloatPropertyValue(BattleController, TEXT("RhythmPartyHP"), CombatState->PartyHP);
-		SetFloatPropertyValue(BattleController, TEXT("RhythmPartyMaxHP"), CombatState->PartyMaxHP);
-		SetFloatPropertyValue(BattleController, TEXT("RhythmLastPartyDamage"), 0.0f);
-		UMelodiaCombatSyncLibrary::MirrorCombatStateToLegacyProperties(BattleController, CombatState, FMelodiaCombatLegacyOverrides());
 	}
 
 	// Bridge: seed the native rhythm model from the live JRPG template units so HUD/HP match from the first beat.
 	const FMelodiaJRPGVitals SeedVitals = UMelodiaJRPGBridgeLibrary::ReadJRPGVitals(BattleController);
+	const float LevelScale = 1.0f + static_cast<float>(EncounterLevel - 1) * 0.075f;
+	const float ScaledMaxHP = MaxHP * LevelScale;
+	float DisplayMaxHP = ScaledMaxHP;
+	FMelodiaCombatLegacyOverrides ResetOverrides;
+	ResetOverrides.bOverrideLastDamage = true;
+	ResetOverrides.bOverrideLastUltimateDamage = true;
+	ResetOverrides.bOverrideLastToughnessDamage = true;
+	ResetOverrides.bOverrideLastFollowUpBonusDamage = true;
+	ResetOverrides.bOverrideLastPartyDamage = true;
 	if (SeedVitals.bHasEnemies && SeedVitals.EnemyMaxHP > 0.0f)
 	{
-		SetFloatPropertyValue(BattleController, TEXT("RhythmEnemyMaxHP"), SeedVitals.EnemyMaxHP);
-		SetFloatPropertyValue(BattleController, TEXT("RhythmEnemyHP"), SeedVitals.EnemyHP > 0.0f ? SeedVitals.EnemyHP : SeedVitals.EnemyMaxHP);
+		const float ScaledEnemyMax = SeedVitals.EnemyMaxHP * LevelScale;
+		ResetOverrides.bOverrideEnemyMaxHP = true;
+		ResetOverrides.EnemyMaxHP = ScaledEnemyMax;
+		ResetOverrides.bOverrideEnemyHP = true;
+		ResetOverrides.EnemyHP = ScaledEnemyMax;
+		DisplayMaxHP = ScaledEnemyMax;
+		UMelodiaJRPGBridgeLibrary::SetActiveEnemyHP(BattleController, ScaledEnemyMax);
+	}
+	else
+	{
+		ResetOverrides.bOverrideEnemyMaxHP = true;
+		ResetOverrides.EnemyMaxHP = ScaledMaxHP;
+		ResetOverrides.bOverrideEnemyHP = true;
+		ResetOverrides.EnemyHP = ScaledMaxHP;
 	}
 	if (SeedVitals.bHasParty && SeedVitals.PartyMaxHP > 0.0f && CombatState)
 	{
 		CombatState->PartyMaxHP = FMath::Max(1.0f, SeedVitals.PartyMaxHP);
 		CombatState->PartyHP = FMath::Clamp(SeedVitals.PartyHP > 0.0f ? SeedVitals.PartyHP : SeedVitals.PartyMaxHP, 1.0f, CombatState->PartyMaxHP);
-		SetFloatPropertyValue(BattleController, TEXT("RhythmPartyHP"), CombatState->PartyHP);
-		SetFloatPropertyValue(BattleController, TEXT("RhythmPartyMaxHP"), CombatState->PartyMaxHP);
 	}
 
-	SetFloatPropertyValue(BattleController, TEXT("RhythmUltimateGauge"), 0.0f);
+	if (CombatState)
+	{
+		UMelodiaCombatSyncLibrary::MirrorCombatStateToLegacyProperties(BattleController, CombatState, ResetOverrides);
+	}
+	else
+	{
+		SetFloatPropertyValue(BattleController, TEXT("RhythmEnemyHP"), ResetOverrides.EnemyHP);
+		SetFloatPropertyValue(BattleController, TEXT("RhythmEnemyMaxHP"), ResetOverrides.EnemyMaxHP);
+		SetFloatPropertyValue(BattleController, TEXT("RhythmLastDamage"), 0.0f);
+		SetFloatPropertyValue(BattleController, TEXT("RhythmLastUltimateDamage"), 0.0f);
+		SetFloatPropertyValue(BattleController, TEXT("RhythmUltimateGauge"), 0.0f);
+		SetIntPropertyValue(BattleController, TEXT("RhythmUltimateActivationCount"), 0);
+		SetIntPropertyValue(BattleController, TEXT("RhythmLastSkillPointDelta"), 0);
+		SetIntPropertyValue(BattleController, TEXT("RhythmBasicActivationCount"), 0);
+		SetIntPropertyValue(BattleController, TEXT("RhythmSkillActivationCount"), 0);
+		SetIntPropertyValue(BattleController, TEXT("RhythmEnemyBreakCount"), 0);
+		SetFloatPropertyValue(BattleController, TEXT("RhythmLastToughnessDamage"), 0.0f);
+		SetFloatPropertyValue(BattleController, TEXT("RhythmLastFollowUpBonusDamage"), 0.0f);
+		SetBoolPropertyValue(BattleController, TEXT("bRhythmEnemyBroken"), false);
+		SetBoolPropertyValue(BattleController, TEXT("bRhythmBreakFollowUpAvailable"), false);
+		SetBoolPropertyValue(BattleController, TEXT("bRhythmBreakFollowUpConsumed"), false);
+		SetBoolPropertyValue(BattleController, TEXT("bRhythmUltimateReady"), false);
+		SetIntPropertyValue(BattleController, TEXT("RhythmBreakFollowUpAvailableCount"), 0);
+		SetIntPropertyValue(BattleController, TEXT("RhythmBreakFollowUpConsumedCount"), 0);
+		SetIntPropertyValue(BattleController, TEXT("RhythmEnemyTurnDelayStacks"), 0);
+		SetIntPropertyValue(BattleController, TEXT("RhythmLastEnemyTurnDelay"), 0);
+		SetIntPropertyValue(BattleController, TEXT("RhythmEnemyTurnDelayApplyCount"), 0);
+	}
+
 	SetIntPropertyValue(BattleController, TEXT("RhythmCombo"), 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmUltimateActivationCount"), 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmLastSkillPointDelta"), 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmBasicActivationCount"), 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmSkillActivationCount"), 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmEnemyBreakCount"), 0);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmLastToughnessDamage"), 0.0f);
-	SetFloatPropertyValue(BattleController, TEXT("RhythmLastFollowUpBonusDamage"), 0.0f);
-	SetBoolPropertyValue(BattleController, TEXT("bRhythmEnemyBroken"), false);
-	SetBoolPropertyValue(BattleController, TEXT("bRhythmBreakFollowUpAvailable"), false);
-	SetBoolPropertyValue(BattleController, TEXT("bRhythmBreakFollowUpConsumed"), false);
-	SetBoolPropertyValue(BattleController, TEXT("bRhythmUltimateReady"), false);
-	SetIntPropertyValue(BattleController, TEXT("RhythmBreakFollowUpAvailableCount"), 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmBreakFollowUpConsumedCount"), 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmEnemyTurnDelayStacks"), 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmLastEnemyTurnDelay"), 0);
-	SetIntPropertyValue(BattleController, TEXT("RhythmEnemyTurnDelayApplyCount"), 0);
 	SetBoolPropertyValue(BattleController, TEXT("isBattleOver"), false);
 	SetBoolPropertyValue(BattleController, TEXT("isPlayerVictory"), false);
 	BattleController->Tags.Remove(RhythmVictoryResolvedTag);
@@ -892,11 +983,11 @@ void UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(AActor* BattleControl
 		const int32 SkillPointMax = GetRhythmSkillPointMax(BattleController);
 		const float EnemyToughness = CombatState ? CombatState->EnemyToughness : GetFloatPropertyValue(BattleController, TEXT("RhythmEnemyToughness"), 100.0f);
 		const float EnemyToughnessMax = CombatState ? CombatState->EnemyToughnessMax : GetFloatPropertyValue(BattleController, TEXT("RhythmEnemyToughnessMax"), 100.0f);
-		ForEachRhythmHUD(World, [MaxHP, SkillPoints, SkillPointMax, EnemyToughness, EnemyToughnessMax, CombatState](UMelodiaRhythmHUDWidget& Widget)
+		ForEachRhythmHUD(World, [DisplayMaxHP, SkillPoints, SkillPointMax, EnemyToughness, EnemyToughnessMax, CombatState, EncounterLevel](UMelodiaRhythmHUDWidget& Widget)
 		{
 			Widget.bDrawExplorationHUD = false;
 			Widget.ClearBattleStatus();
-			Widget.SetEnemyVitals(MaxHP, MaxHP);
+			Widget.SetEnemyVitals(DisplayMaxHP, DisplayMaxHP);
 			Widget.SetEnemyBreakGauge(EnemyToughness, EnemyToughnessMax, false);
 			Widget.SetBreakFollowUpWindow(false, false, 0.0f);
 			Widget.SetEnemyTurnDelay(0, 0);
@@ -911,9 +1002,9 @@ void UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(AActor* BattleControl
 				? UMelodiaCoreRulesLibrary::GetElementDisplayName(CombatState->EnemyElement).ToString()
 				: TEXT("?");
 			Widget.ShowActionPrompt(FString::Printf(
-				TEXT("Enemy: %s | Tap Space/1 | 2=Skill highway | Tab=cycle skill"),
+				TEXT("Weakness: %s | 1=Attack | 2=Skill | R=Ultimate | Tab=cycle skill"),
 				*EnemyElementName));
-			Widget.ShowBattleStatus(TEXT("Battle start | watch the beat pulse"));
+			Widget.ShowBattleStatus(FString::Printf(TEXT("Battle Lv%d — break the toughness bar for bonus damage"), EncounterLevel));
 		});
 	}
 }

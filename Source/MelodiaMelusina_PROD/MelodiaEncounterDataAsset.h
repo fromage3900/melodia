@@ -23,8 +23,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Melodia|Encounter")
 	FSoftClassPath BattleDataClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Melodia|Encounter", meta = (ClampMin = "1"))
-	int32 EncounterLevel = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Melodia|Encounter", meta = (ClampMin = "0"))
+	int32 EncounterLevel = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Melodia|Encounter")
 	EMelodiaSpellElement EnemyElement = EMelodiaSpellElement::Forte;

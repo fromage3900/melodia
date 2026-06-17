@@ -21,6 +21,7 @@
 #include "MelodiaExplorationInputComponent.h"
 #include "MelodiaInventoryComponent.h"
 #include "MelodiaJRPGBridgeLibrary.h"
+#include "MelodiaJRPGPresenter.h"
 #include "MelodiaLoopVerifier.h"
 #include "MelodiaMusicManager.h"
 #include "MelodiaNPCBase.h"
@@ -148,10 +149,8 @@ void AMelodiaRhythmGameModeBase::BeginPlay()
 
 	if (UClass* RhythmHUDClass = ResolveClass(RhythmHUDActorClassPath))
 	{
-		if (!FindExistingActorOfClass(RhythmHUDClass))
-		{
-			SpawnLoopActor(RhythmHUDClass, FVector(-10620.0f, -5000.0f, -2140.0f), FRotator::ZeroRotator);
-		}
+		// Strategy B: single HUD owner is WBP_RhythmHUD via EnsureRhythmHUDWidget — do not spawn BP_RhythmHUD (duplicate widgets).
+		(void)RhythmHUDClass;
 	}
 
 	EnsureRhythmHUDWidget();
@@ -202,6 +201,34 @@ void AMelodiaRhythmGameModeBase::NotifyBattleSessionBegan(AActor* BattleControll
 	PrepareMelodiaBattleView();
 }
 
+void AMelodiaRhythmGameModeBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (!bJRPGOnlyMode)
+	{
+		return;
+	}
+
+	AActor* BattleController = ActiveBattleController.Get();
+	if (!BattleController)
+	{
+		return;
+	}
+
+	// When Phoenix marks battle over, force-return to exploration loop.
+	if (const FBoolProperty* BattleOverProp = CastField<FBoolProperty>(BattleController->GetClass()->FindPropertyByName(TEXT("isBattleOver"))))
+	{
+		const bool bBattleOver = BattleOverProp->GetPropertyValue_InContainer(BattleController);
+		if (bBattleOver)
+		{
+			PrepareExplorationPresentation();
+			SetLoopPhase(EMelodiaLoopPhase::ExplorationReady);
+			ActiveBattleController = nullptr;
+		}
+	}
+}
+
 void AMelodiaRhythmGameModeBase::SetLoopPhase(const EMelodiaLoopPhase NewPhase)
 {
 	CurrentLoopPhase = NewPhase;
@@ -211,13 +238,30 @@ void AMelodiaRhythmGameModeBase::SetLoopPhase(const EMelodiaLoopPhase NewPhase)
 	{
 	case EMelodiaLoopPhase::Battle:
 		++BattlePhaseEntryCount;
-		EnsureBattleMusicClock();
-		EnsureBattleInputBridge();
-		PrepareMelodiaBattleView();
-		EnsureRhythmHUDWidget();
-		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(GetWorld()))
+		if (!bJRPGOnlyMode)
 		{
-			Widget->bDrawExplorationHUD = false;
+			EnsureBattleMusicClock();
+			EnsureBattleInputBridge();
+			PrepareMelodiaBattleView();
+			EnsureRhythmHUDWidget();
+			if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(GetWorld()))
+			{
+				Widget->bDrawExplorationHUD = false;
+				if (bHSRStyleBattle && !bUseRhythmHighway)
+				{
+					Widget->SetNoteHighwayActive(false, TArray<FMelodiaHighwayNote>(), 0.0f, 2.5f);
+					Widget->ShowActionPrompt(TEXT("1=Attack | 2=Skill | R=Ultimate | Tab=cycle | 4/Esc=Flee"));
+				}
+			}
+		}
+		else
+		{
+			PrepareMelodiaBattleView();
+			if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(GetWorld()))
+			{
+				Widget->bDrawExplorationHUD = false;
+				Widget->ShowActionPrompt(TEXT("Phoenix JRPG battle (legacy mode)"));
+			}
 		}
 		break;
 	case EMelodiaLoopPhase::VictoryReward:
@@ -239,6 +283,7 @@ void AMelodiaRhythmGameModeBase::SetLoopPhase(const EMelodiaLoopPhase NewPhase)
 		break;
 	case EMelodiaLoopPhase::ExplorationReady:
 		++ExplorationReadyPhaseCount;
+		ActiveBattleController = nullptr;
 		if (UWorld* World = GetWorld())
 		{
 			World->GetTimerManager().ClearTimer(VictoryAutoExitHandle);
@@ -252,6 +297,13 @@ void AMelodiaRhythmGameModeBase::SetLoopPhase(const EMelodiaLoopPhase NewPhase)
 		if (ActiveEncounterTrigger)
 		{
 			ActiveEncounterTrigger->ArmEncounter();
+		}
+		if (APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0))
+		{
+			if (APawn* ExplorationPawn = ActiveExplorationPawn.Get())
+			{
+				PlayerController->SetViewTargetWithBlend(ExplorationPawn, 0.35f);
+			}
 		}
 		break;
 	case EMelodiaLoopPhase::Bootstrapping:
@@ -686,13 +738,21 @@ void AMelodiaRhythmGameModeBase::EnsureRhythmHUDWidget()
 		return;
 	}
 
-	if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
+	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(World, 0);
+	if (PlayerController)
 	{
-		ActiveRhythmHUDWidget = Widget;
-		ActiveRhythmHUDWidget->ApplyCuteCombatTheme();
-		ActiveRhythmHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-		bRhythmHUDWidgetInViewport = true;
-		return;
+		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		{
+			if (It->GetWorld() == World && It->GetOwningPlayer() == PlayerController)
+			{
+				ActiveRhythmHUDWidget = *It;
+				ActiveRhythmHUDWidget->ApplyCuteCombatTheme();
+				ActiveRhythmHUDWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+				bRhythmHUDWidgetInViewport = true;
+				UE_LOG(LogTemp, Log, TEXT("Melodia loop adopted existing player-owned rhythm HUD widget."));
+				return;
+			}
+		}
 	}
 
 	UClass* WidgetClass = ResolveClass(RhythmHUDWidgetClassPath);
@@ -701,7 +761,6 @@ void AMelodiaRhythmGameModeBase::EnsureRhythmHUDWidget()
 		WidgetClass = UMelodiaRhythmHUDWidget::StaticClass();
 		UE_LOG(LogTemp, Warning, TEXT("Melodia loop fell back to native UMelodiaRhythmHUDWidget."));
 	}
-	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(World, 0);
 	if (!WidgetClass)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Melodia loop could not load rhythm HUD widget class: %s"), *RhythmHUDWidgetClassPath.ToString());
@@ -725,6 +784,12 @@ void AMelodiaRhythmGameModeBase::EnsureRhythmHUDWidget()
 		bRhythmHUDWidgetInViewport = true;
 		UE_LOG(LogTemp, Log, TEXT("Melodia loop added native rhythm HUD widget to viewport."));
 	}
+}
+
+UMelodiaRhythmHUDWidget* AMelodiaRhythmGameModeBase::EnsureActiveRhythmHUD()
+{
+	EnsureRhythmHUDWidget();
+	return ActiveRhythmHUDWidget;
 }
 
 void AMelodiaRhythmGameModeBase::EnsureQuestManager()
@@ -1411,7 +1476,7 @@ void AMelodiaRhythmGameModeBase::SanitizeWorldForMinimalDemo()
 	{
 		for (TActorIterator<AActor> It(World, BattleControllerClass); It; ++It)
 		{
-			UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(*It);
+			UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(*It, EMelodiaPhoenixTeardownScope::Full);
 			It->SetActorHiddenInGame(true);
 			It->SetActorEnableCollision(false);
 		}
@@ -1432,43 +1497,57 @@ void AMelodiaRhythmGameModeBase::PrepareMelodiaBattleView()
 		return;
 	}
 
-	APawn* ExplorationPawn = Cast<APawn>(PlayerController->GetPawn());
-	if (!ExplorationPawn)
-	{
-		ExplorationPawn = ActiveExplorationPawn.Get();
-	}
-	if (!ExplorationPawn)
-	{
-		ExplorationPawn = Cast<APawn>(FindExistingActorOfClass(ResolveClass(ExplorationPawnClassPath)));
-	}
-	if (ExplorationPawn)
-	{
-		ActiveExplorationPawn = ExplorationPawn;
-		PlayerController->Possess(ExplorationPawn);
-		PlayerController->SetViewTarget(ExplorationPawn);
-	}
-
-	PlayerController->SetIgnoreMoveInput(true);
-	PlayerController->SetIgnoreLookInput(false);
-	PlayerController->bShowMouseCursor = false;
-
 	AActor* BattleController = ActiveBattleController.Get();
 	if (!BattleController)
 	{
 		BattleController = FindExistingActorOfClass(ResolveClass(BattleControllerClassPath));
 	}
-	if (BattleController && !bSuppressPhoenixBattleUI)
+
+	if (bKeepPhoenixBattlePresentation && BattleController)
 	{
-		// Option B: leave Phoenix command UI visible for designer replacement.
+		UMelodiaJRPGPresenter::PrepareBattlePresentation(
+			this,
+			BattleController,
+			bSuppressPhoenixBattleUI);
 	}
-	else if (BattleController)
+	else
 	{
-		UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(BattleController);
+		APawn* ExplorationPawn = Cast<APawn>(PlayerController->GetPawn());
+		if (!ExplorationPawn)
+		{
+			ExplorationPawn = ActiveExplorationPawn.Get();
+		}
+		if (!ExplorationPawn)
+		{
+			ExplorationPawn = Cast<APawn>(FindExistingActorOfClass(ResolveClass(ExplorationPawnClassPath)));
+		}
+		if (ExplorationPawn)
+		{
+			ActiveExplorationPawn = ExplorationPawn;
+			PlayerController->Possess(ExplorationPawn);
+			PlayerController->SetViewTarget(ExplorationPawn);
+		}
+
+		PlayerController->SetIgnoreMoveInput(true);
+		PlayerController->SetIgnoreLookInput(false);
+		PlayerController->bShowMouseCursor = false;
+
+		if (BattleController && bSuppressPhoenixBattleUI)
+		{
+			UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(BattleController, EMelodiaPhoenixTeardownScope::WidgetsOnly);
+		}
 	}
 
 	if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 	{
-		Widget->ShowActionPrompt(TEXT("1=Attack | 2=Skill (rhythm) | 4 or Esc=Flee"));
+		if (bHSRStyleBattle && !bUseRhythmHighway)
+		{
+			Widget->ShowActionPrompt(TEXT("1=Attack | 2=Skill | R=Ultimate | Tab=cycle | 4/Esc=Flee"));
+		}
+		else
+		{
+			Widget->ShowActionPrompt(TEXT("1=Attack | 2=Skill (rhythm) | 4 or Esc=Flee"));
+		}
 	}
 }
 
@@ -1508,7 +1587,7 @@ void AMelodiaRhythmGameModeBase::PrepareExplorationPresentation()
 	{
 		for (TActorIterator<AActor> It(World, BattleControllerClass); It; ++It)
 		{
-			UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(*It);
+			UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(*It, EMelodiaPhoenixTeardownScope::Full);
 			It->SetActorHiddenInGame(true);
 			It->SetActorEnableCollision(false);
 		}

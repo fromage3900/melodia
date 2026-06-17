@@ -36,11 +36,54 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Melodia|Battle Session")
 	FMelodiaEncounterDefinition ActiveEncounter;
 
+	/** Result of the most recent EndEncounter call (Victory / Defeat / Fled). */
+	UPROPERTY(BlueprintReadOnly, Category = "Melodia|Battle Session")
+	EMelodiaEncounterResult LastEncounterResult = EMelodiaEncounterResult::None;
+
+	/** Monotonic counter incremented on each SetBattlePhase transition (PIE diagnostics). */
+	UPROPERTY(BlueprintReadOnly, Category = "Melodia|Battle Session")
+	int32 EncounterPhaseLogCount = 0;
+
+	/** Human-readable last phase transition (Previous -> New). */
+	UPROPERTY(BlueprintReadOnly, Category = "Melodia|Battle Session")
+	FString LastEncounterPhaseLogEntry;
+
+	/** Successful command submissions routed through this session. */
+	UPROPERTY(BlueprintReadOnly, Category = "Melodia|Battle Session")
+	int32 CommandSubmitCount = 0;
+
 	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session", meta = (WorldContext = "WorldContextObject"))
 	static UMelodiaBattleSession* Get(const UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
+	EMelodiaBattlePhase GetBattlePhase() const { return BattlePhase; }
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
+	EMelodiaHUDMode GetHUDMode() const { return HUDMode; }
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
+	AActor* GetActiveBattleController() const { return ActiveBattleController; }
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
+	EMelodiaEncounterResult GetLastEncounterResult() const { return LastEncounterResult; }
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
 	bool IsEncounterActive() const;
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
+	bool IsAwaitingPlayerCommand() const;
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
+	bool IsRhythmExecutionActive() const;
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
+	bool CanSubmitBasicCommand() const;
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
+	bool CanSubmitUltimateCommand() const;
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Battle Session")
+	bool CanSubmitFleeCommand() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Battle Session")
 	bool BeginEncounter(const FMelodiaEncounterDefinition& Encounter, const bool bSuppressPhoenixBattleUI = false);

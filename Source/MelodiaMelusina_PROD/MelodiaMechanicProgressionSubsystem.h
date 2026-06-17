@@ -35,6 +35,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Mechanic")
 	void ResetToDemoDefaults();
 
+	/** PIE/dev: jump to mechanic level 1–30, unlock content, sync HUD and quests. */
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Mechanic|Dev")
+	void SetMechanicLevelForDemo(int32 NewLevel);
+
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Mechanic")
 	bool GrantMechanicXP(int32 Amount, const FString& Reason);
 
@@ -70,6 +74,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Mechanic")
 	void WriteToSave(UMelodiaSaveGame* SaveData) const;
+
+	/** Persists mechanic progression (and merges into MelodiaSlot). Returns false if save failed. */
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Mechanic")
+	bool SaveToDefaultSlot(const FString& Reason);
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Mechanic")
 	void CycleActiveSkill();

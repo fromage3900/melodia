@@ -4,12 +4,14 @@
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Kismet/GameplayStatics.h"
 #include "MelodiaKeySystemLibrary.h"
 #include "MelodiaMechanicProgressionLibrary.h"
 #include "MelodiaPartySubsystem.h"
 #include "MelodiaQuestManagerBase.h"
 #include "MelodiaReverieRunManager.h"
 #include "MelodiaRhythmHUDWidget.h"
+#include "MelodiaSaveGame.h"
 #include "MelodiaSaveGame.h"
 #include "MelodiaSongSkillLibrary.h"
 
@@ -33,6 +35,38 @@ void UMelodiaMechanicProgressionSubsystem::ResetToDemoDefaults()
 	State.EquippedKeyElement = EMelodiaSpellElement::Forte;
 	State.bCompanionUnlocked = false;
 	UnlockContentUpToLevel(State.MechanicLevel);
+}
+
+void UMelodiaMechanicProgressionSubsystem::SetMechanicLevelForDemo(const int32 NewLevel)
+{
+	const int32 Clamped = FMath::Clamp(NewLevel, 1, UMelodiaMechanicProgressionLibrary::DemoMaxMechanicLevel);
+	const int32 PreviousLevel = State.MechanicLevel;
+	if (Clamped == PreviousLevel && State.MechanicXP == 0)
+	{
+		UnlockContentUpToLevel(Clamped);
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			SyncHUD(GI->GetWorld());
+		}
+		return;
+	}
+
+	State.MechanicLevel = Clamped;
+	State.MechanicXP = 0;
+	UnlockContentUpToLevel(Clamped);
+
+	if (Clamped != PreviousLevel)
+	{
+		OnMechanicLevelChanged.Broadcast(Clamped, PreviousLevel);
+	}
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		NotifyQuestSystemOfProgress(GI->GetWorld());
+		SyncHUD(GI->GetWorld());
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("Melodia dev: mechanic level set to %d (was %d)."), Clamped, PreviousLevel);
 }
 
 bool UMelodiaMechanicProgressionSubsystem::GrantMechanicXP(const int32 Amount, const FString& Reason)
@@ -192,6 +226,48 @@ void UMelodiaMechanicProgressionSubsystem::WriteToSave(UMelodiaSaveGame* SaveDat
 	SaveData->ActiveSkillId = State.ActiveSkillId;
 	SaveData->EquippedKeyElement = State.EquippedKeyElement;
 	SaveData->bCompanionUnlocked = State.bCompanionUnlocked;
+}
+
+bool UMelodiaMechanicProgressionSubsystem::SaveToDefaultSlot(const FString& Reason)
+{
+	UGameInstance* GI = GetGameInstance();
+	if (!GI)
+	{
+		return false;
+	}
+
+	static const TCHAR* DefaultSlot = TEXT("MelodiaSlot");
+	const int32 UserIndex = 0;
+
+	UMelodiaSaveGame* SaveData = Cast<UMelodiaSaveGame>(UGameplayStatics::LoadGameFromSlot(DefaultSlot, UserIndex));
+	if (!SaveData)
+	{
+		SaveData = Cast<UMelodiaSaveGame>(UGameplayStatics::CreateSaveGameObject(UMelodiaSaveGame::StaticClass()));
+	}
+	if (!SaveData)
+	{
+		return false;
+	}
+
+	SaveData->LastSaveReason = Reason;
+	if (UWorld* World = GI->GetWorld())
+	{
+		SaveData->LastMapName = FName(*UGameplayStatics::GetCurrentLevelName(World, true));
+	}
+
+	WriteToSave(SaveData);
+	const bool bSaved = UGameplayStatics::SaveGameToSlot(SaveData, DefaultSlot, UserIndex);
+	if (bSaved)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Melodia progression saved to %s (%s) — Lv%d."), DefaultSlot, *Reason, State.MechanicLevel);
+		SyncHUD(GI->GetWorld());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Melodia progression save to %s failed (%s)."), DefaultSlot, *Reason);
+	}
+
+	return bSaved;
 }
 
 void UMelodiaMechanicProgressionSubsystem::CycleActiveSkill()

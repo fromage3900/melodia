@@ -32,6 +32,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop", meta=(DefaultToSelf="WorldContextObject"))
 	static bool ExecuteRhythmBattleCommand(UObject* WorldContextObject, AActor* BattleController, EMelodiaRhythmBattleCommand Command, float Grade = 1.0f, int32 ComboToWin = 3);
 
+	/** Traditional JRPG skill execution (instant): applies a skill recipe as a single action (no rhythm highway). */
+	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop", meta=(DefaultToSelf="WorldContextObject"))
+	static bool ExecuteInstantSkillRecipe(UObject* WorldContextObject, AActor* BattleController, const FMelodiaSongSkillRecipe& Recipe, float Grade = 1.0f);
+
 	UFUNCTION(BlueprintPure, Category="Melodia|Battle Loop")
 	static bool HasRhythmVictoryResolved(AActor* BattleController);
 
@@ -72,7 +76,7 @@ public:
 	static bool IsPartyDefeated(AActor* BattleController);
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop")
-	static void ResetRhythmBattleEncounter(AActor* BattleController);
+	static void ResetRhythmBattleEncounter(AActor* BattleController, int32 OverrideEncounterLevel = 0);
 
 	UFUNCTION(BlueprintCallable, Category="Melodia|Battle Loop")
 	static void ConfirmRhythmVictoryReward(AActor* BattleController);
@@ -87,7 +91,7 @@ private:
 	static int32 GetIntPropertyValue(AActor* Actor, FName PropertyName, int32 FallbackValue);
 	static void SetIntPropertyValue(AActor* Actor, FName PropertyName, int32 Value);
 	static void SetBoolPropertyValue(AActor* Actor, FName PropertyName, bool bValue);
-	static bool ApplyRhythmBattleAction(UObject* WorldContextObject, AActor* BattleController, float Grade, int32 ComboToWin, bool bSkillAction, EMelodiaSpellElement AttackElement = EMelodiaSpellElement::Forte);
+	static bool ApplyRhythmBattleAction(UObject* WorldContextObject, AActor* BattleController, float Grade, int32 ComboToWin, bool bSkillAction, EMelodiaSpellElement AttackElement = EMelodiaSpellElement::Forte, int32 SkillCost = 1, float SkillScalar = 1.0f);
 	static void PublishReactiveCommandState(AActor* BattleController, const FString& CommandName, const FString& IntentName, float IntentPower, bool bUltimateWindow, bool bUltimateInterrupt);
 	static void ResolveRhythmVictory(UObject* WorldContextObject, AActor* BattleController, float RemainingHP);
 };

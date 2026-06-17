@@ -48,3 +48,6 @@ Content/Melodia/UI/Fonts/_extracted/
 
 # Python cache
 Scripts/**/__pycache__/
+
+# Per-machine editor launcher overrides (see Scripts/local-paths.ps1.example)
+Scripts/local-paths.ps1

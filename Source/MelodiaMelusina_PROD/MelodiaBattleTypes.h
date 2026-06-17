@@ -17,6 +17,14 @@ enum class EMelodiaBattlePhase : uint8
 	Fled UMETA(DisplayName = "Fled")
 };
 
+/** Strategy B: WidgetsOnly strips Phoenix menus/HUD but keeps units + battle camera. Full hides everything. */
+UENUM(BlueprintType)
+enum class EMelodiaPhoenixTeardownScope : uint8
+{
+	WidgetsOnly UMETA(DisplayName = "Widgets Only"),
+	Full UMETA(DisplayName = "Full")
+};
+
 UENUM(BlueprintType)
 enum class EMelodiaHUDMode : uint8
 {

@@ -217,10 +217,14 @@ bool UMelodiaBattleInputComponent::HandleSkillInput()
 		}
 	}
 
-	if (Execution && Execution->BeginSkillExecution())
+	const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(GetWorld()->GetAuthGameMode());
+	if (GameMode && GameMode->bUseRhythmHighway)
 	{
-		ShowActiveSkillPrompt();
-		return true;
+		if (Execution && Execution->BeginSkillExecution())
+		{
+			ShowActiveSkillPrompt();
+			return true;
+		}
 	}
 
 	return false;
@@ -265,9 +269,19 @@ void UMelodiaBattleInputComponent::ShowActiveSkillPrompt() const
 				const FString SkillName = Progression->GetActiveSkillDisplayName().ToString();
 				if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 				{
-					Widget->ShowActionPrompt(FString::Printf(
-						TEXT("Active skill: %s | 2=Rhythm highway | Tab=cycle"),
-						*SkillName));
+					const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(World->GetAuthGameMode());
+					if (GameMode && GameMode->bHSRStyleBattle && !GameMode->bUseRhythmHighway)
+					{
+						Widget->ShowActionPrompt(FString::Printf(
+							TEXT("Active skill: %s | 2=Use | Tab=cycle"),
+							*SkillName));
+					}
+					else
+					{
+						Widget->ShowActionPrompt(FString::Printf(
+							TEXT("Active skill: %s | 2=Rhythm highway | Tab=cycle"),
+							*SkillName));
+					}
 				}
 			}
 		}

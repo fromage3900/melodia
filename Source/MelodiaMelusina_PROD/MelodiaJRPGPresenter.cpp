@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "MelodiaJRPGBridgeLibrary.h"
+#include "MelodiaBattleBridgeLibrary.h"
 #include "UObject/UnrealType.h"
 
 bool UMelodiaJRPGPresenter::InitializeEncounter(
@@ -92,20 +93,65 @@ bool UMelodiaJRPGPresenter::InitializeEncounter(
 
 	if (bSuppressPhoenixBattleUI)
 	{
-		UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(BattleController);
+		UMelodiaJRPGBridgeLibrary::SyncPartyUnitsFromSubsystem(WorldContextObject, BattleController);
+		PrepareBattlePresentation(WorldContextObject, BattleController, true);
+	}
+	else
+	{
+		UMelodiaJRPGBridgeLibrary::EnsurePhoenixBattleUnitsVisible(BattleController);
+		UMelodiaJRPGBridgeLibrary::SyncPartyUnitsFromSubsystem(WorldContextObject, BattleController);
 	}
 
-	UMelodiaJRPGBridgeLibrary::SyncPartyUnitsFromSubsystem(WorldContextObject, BattleController);
+	return true;
+}
+
+bool UMelodiaJRPGPresenter::PrepareBattlePresentation(
+	UObject* WorldContextObject,
+	AActor* BattleController,
+	const bool bStripPhoenixUI)
+{
+	if (!BattleController)
+	{
+		return false;
+	}
+
+	BattleController->SetActorHiddenInGame(false);
+	BattleController->SetActorEnableCollision(true);
+	UMelodiaJRPGBridgeLibrary::EnsurePhoenixBattleUnitsVisible(BattleController);
+
+	if (bStripPhoenixUI)
+	{
+		UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(BattleController, EMelodiaPhoenixTeardownScope::WidgetsOnly);
+	}
+
+	if (APlayerController* PlayerController = WorldContextObject
+		? UGameplayStatics::GetPlayerController(WorldContextObject, 0)
+		: nullptr)
+	{
+		PlayerController->SetIgnoreMoveInput(true);
+		PlayerController->SetIgnoreLookInput(false);
+		PlayerController->bShowMouseCursor = false;
+		UMelodiaJRPGBridgeLibrary::ApplyPhoenixBattleCameraView(PlayerController, BattleController);
+	}
 
 	return true;
 }
 
 void UMelodiaJRPGPresenter::TeardownPresentation(AActor* BattleController)
 {
-	UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(BattleController);
+	UMelodiaJRPGBridgeLibrary::TeardownPhoenixBattleUI(BattleController, EMelodiaPhoenixTeardownScope::Full);
 }
 
 bool UMelodiaJRPGPresenter::TryFleePresentation(AActor* BattleController)
 {
 	return UMelodiaJRPGBridgeLibrary::TryFleeBattle(BattleController);
+}
+
+bool UMelodiaJRPGPresenter::TryRoutePhoenixSkillMenuToSession(
+	UObject* WorldContextObject,
+	AActor* BattleController,
+	const int32 MenuSkillIndex)
+{
+	(void)BattleController;
+	return UMelodiaBattleBridgeLibrary::PhoenixSubmitSkillByMenuIndex(WorldContextObject, MenuSkillIndex);
 }

@@ -36,13 +36,39 @@ UMelodiaRhythmHUDWidget* UMelodiaRhythmHUDWidget::FindFirst(const UObject* World
 		return nullptr;
 	}
 
+	const UWorld* World = WorldContextObject->GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	if (const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(UGameplayStatics::GetGameMode(World)))
+	{
+		if (UMelodiaRhythmHUDWidget* ActiveWidget = GameMode->GetRhythmHUDWidget())
+		{
+			return ActiveWidget;
+		}
+	}
+
+	if (const APlayerController* PlayerController = UGameplayStatics::GetPlayerController(World, 0))
+	{
+		for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
+		{
+			if (It->GetWorld() == World && It->GetOwningPlayer() == PlayerController)
+			{
+				return *It;
+			}
+		}
+	}
+
 	for (TObjectIterator<UMelodiaRhythmHUDWidget> It; It; ++It)
 	{
-		if (It->GetWorld() == WorldContextObject->GetWorld())
+		if (It->GetWorld() == World)
 		{
 			return *It;
 		}
 	}
+
 	return nullptr;
 }
 

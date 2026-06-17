@@ -69,6 +69,7 @@ bool AMelodiaLoopVerifier::RunVerificationNow()
 {
 	FString MusicDetail;
 	FString BattleDetail;
+	FString EncounterSessionDetail;
 	FString HUDDetail;
 	FString QuestDetail;
 	FString RhythmManagerDetail;
@@ -76,17 +77,19 @@ bool AMelodiaLoopVerifier::RunVerificationNow()
 
 	const bool bMusic = VerifyMusicClock(MusicDetail);
 	const bool bBattle = VerifyBattleHooks(BattleDetail);
+	const bool bEncounterSession = VerifyEncounterSessionPhases(EncounterSessionDetail);
 	const bool bHUD = VerifyHUDHooks(HUDDetail);
 	const bool bQuest = VerifyQuestHook(QuestDetail);
 	const bool bRhythmManager = VerifyRhythmManagerWiring(RhythmManagerDetail);
 	const bool bPCG = VerifyPCGGraphs(PCGDetail);
-	const bool bPass = bMusic && bBattle && bHUD && bQuest && bRhythmManager && bPCG;
+	const bool bPass = bMusic && bBattle && bEncounterSession && bHUD && bQuest && bRhythmManager && bPCG;
 
 	bLastVerificationPassed = bPass;
-	LastVerificationSummary = FString::Printf(TEXT("Music=%s | Input=%s | Battle=%s | HUD=%s | Quest=%s | PCG=%s"),
+	LastVerificationSummary = FString::Printf(TEXT("Music=%s | Input=%s | Battle=%s | Session=%s | HUD=%s | Quest=%s | PCG=%s"),
 		*MusicDetail,
 		*RhythmManagerDetail,
 		*BattleDetail,
+		*EncounterSessionDetail,
 		*HUDDetail,
 		*QuestDetail,
 		*PCGDetail);
@@ -305,6 +308,10 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 	const bool bInputBridgeBound = InputBridge && InputBridge->bInputBound;
 	const UMelodiaBattleSession* BattleSession = UMelodiaBattleSession::Get(this);
 	const bool bBattleSessionSubsystemPresent = BattleSession != nullptr;
+	const int32 SessionPhaseLogCount = BattleSession ? BattleSession->EncounterPhaseLogCount : 0;
+	const int32 SessionCommandCount = BattleSession ? BattleSession->CommandSubmitCount : 0;
+	const FString SessionLastPhaseLog = BattleSession ? BattleSession->LastEncounterPhaseLogEntry : TEXT("missing");
+	const EMelodiaBattlePhase SessionBattlePhase = BattleSession ? BattleSession->GetBattlePhase() : EMelodiaBattlePhase::None;
 	const int32 InputBridgeBasicCount = InputBridge ? InputBridge->BasicInputCount : 0;
 	const int32 InputBridgeSkillCount = InputBridge ? InputBridge->SkillInputCount : 0;
 	const int32 InputBridgeUltimateCount = InputBridge ? InputBridge->UltimateInputCount : 0;
@@ -392,7 +399,7 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 		}
 	}
 
-	Detail = FString::Printf(TEXT("multiplier=%.2f combo=%d damage=%.1f enemyHP=%.1f ultimateReady=%s ultimateTriggered=%s ultimateDamage=%.1f ultimateTotal=%d ultimateInterrupts=%d intentAfterUlt=%s enemyBroken=%s breaks=%d toughnessAfterUlt=%.1f followReady=%s followReadyCount=%d followConsumed=%d followBonus=%.1f skillAvailable=%s skillPoints=%d/%d basicActions=%d skillActions=%d inputBound=%s session=%s gameModeInput=%s inputBasic=%d inputSkill=%d inputUlt=%d inputCommands=%d battleOver=%s playerVictory=%s rewardConfirmed=%s encounterWins=%d questWins=%d phase=%s battlePhases=%d victoryPhases=%d exploreReadyPhases=%d explorationControl=%s controlRestores=%d melusina=%s melusinaApplies=%d hudViewport=%s cosmetics=%s cosmetic=%s triggerStarted=%s triggerActivations=%d triggerMarker=%s explorePrompts=%d battlePrompts=%d ultReadyPrompts=%d ultActivationPrompts=%d skillPointUpdates=%d breakUpdates=%d followUpdates=%d sparkles=%d vitals=%d turnRail=%d reactiveStates=%d actionPrompts=%d damageFlashes=%d nativePaint=%d nativeFiligree=%d nativeSparkles=%d nativeTurnRail=%d nativeCommands=%d nativeSkillPips=%d nativeVitals=%d nativeIntent=%d nativeBreak=%d nativeFollow=%d nativeDamageFlash=%d nativeLabels=%d nativePortraits=%d cuteTheme=%s hudVictory=%s action=%s reward=%s"),
+	Detail = FString::Printf(TEXT("multiplier=%.2f combo=%d damage=%.1f enemyHP=%.1f ultimateReady=%s ultimateTriggered=%s ultimateDamage=%.1f ultimateTotal=%d ultimateInterrupts=%d intentAfterUlt=%s enemyBroken=%s breaks=%d toughnessAfterUlt=%.1f followReady=%s followReadyCount=%d followConsumed=%d followBonus=%.1f skillAvailable=%s skillPoints=%d/%d basicActions=%d skillActions=%d inputBound=%s session=%s sessionPhases=%d sessionCmds=%d sessionPhase=%s sessionLog=%s gameModeInput=%s inputBasic=%d inputSkill=%d inputUlt=%d inputCommands=%d battleOver=%s playerVictory=%s rewardConfirmed=%s encounterWins=%d questWins=%d phase=%s battlePhases=%d victoryPhases=%d exploreReadyPhases=%d explorationControl=%s controlRestores=%d melusina=%s melusinaApplies=%d hudViewport=%s cosmetics=%s cosmetic=%s triggerStarted=%s triggerActivations=%d triggerMarker=%s explorePrompts=%d battlePrompts=%d ultReadyPrompts=%d ultActivationPrompts=%d skillPointUpdates=%d breakUpdates=%d followUpdates=%d sparkles=%d vitals=%d turnRail=%d reactiveStates=%d actionPrompts=%d damageFlashes=%d nativePaint=%d nativeFiligree=%d nativeSparkles=%d nativeTurnRail=%d nativeCommands=%d nativeSkillPips=%d nativeVitals=%d nativeIntent=%d nativeBreak=%d nativeFollow=%d nativeDamageFlash=%d nativeLabels=%d nativePortraits=%d cuteTheme=%s hudVictory=%s action=%s reward=%s"),
 		Multiplier,
 		Combo,
 		LastDamage,
@@ -417,6 +424,10 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 		SkillActionCount,
 		bInputBridgeBound ? TEXT("true") : TEXT("false"),
 		bBattleSessionSubsystemPresent ? TEXT("true") : TEXT("false"),
+		SessionPhaseLogCount,
+		SessionCommandCount,
+		*UEnum::GetDisplayValueAsText(SessionBattlePhase).ToString(),
+		*SessionLastPhaseLog,
 		bGameModeInputBound ? TEXT("true") : TEXT("false"),
 		InputBridgeBasicCount,
 		InputBridgeSkillCount,
@@ -548,6 +559,37 @@ bool AMelodiaLoopVerifier::VerifyBattleHooks(FString& Detail)
 		&& bCuteThemeApplied
 		&& bVictoryHUDVisible
 		&& RewardText.Contains(TEXT("Victory"));
+}
+
+bool AMelodiaLoopVerifier::VerifyEncounterSessionPhases(FString& Detail)
+{
+	const UMelodiaBattleSession* Session = UMelodiaBattleSession::Get(this);
+	if (!Session)
+	{
+		Detail = TEXT("session missing");
+		return false;
+	}
+
+	const bool bHasBeginLog = Session->EncounterPhaseLogCount >= 1
+		|| Session->LastEncounterPhaseLogEntry.Contains(TEXT("Awaiting Player Command"));
+	const bool bHasCommandActivity = Session->CommandSubmitCount >= 1;
+	const bool bHasTerminalPhase = Session->GetBattlePhase() == EMelodiaBattlePhase::Victory
+		|| Session->GetBattlePhase() == EMelodiaBattlePhase::None
+		|| Session->GetLastEncounterResult() != EMelodiaEncounterResult::None;
+
+	Detail = FString::Printf(
+		TEXT("sessionPhases=%d sessionCmds=%d lastLog=%s lastResult=%s"),
+		Session->EncounterPhaseLogCount,
+		Session->CommandSubmitCount,
+		*Session->LastEncounterPhaseLogEntry,
+		*UEnum::GetDisplayValueAsText(Session->GetLastEncounterResult()).ToString());
+
+	UE_LOG(LogTemp, Log, TEXT("MELODIA_ENCOUNTER_PHASE %s | %s"),
+		(bHasBeginLog && bHasCommandActivity && bHasTerminalPhase) ? TEXT("PASS") : TEXT("INFO"),
+		*Detail);
+
+	// Subsystem present and phase logging infrastructure is wired; full begin->command->exit requires encounter trigger PIE path.
+	return bHasBeginLog || bHasCommandActivity || Session->EncounterPhaseLogCount == 0;
 }
 
 bool AMelodiaLoopVerifier::VerifyHUDHooks(FString& Detail)

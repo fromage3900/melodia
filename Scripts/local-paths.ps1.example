@@ -1,0 +1,5 @@
+# Copy this file to local-paths.ps1 (gitignored) and adjust paths for your machine.
+# LaunchMelodiaEditor.ps1 dot-sources local-paths.ps1 when present.
+
+$MelodiaEngineExe = "G:\MooaToon-main\MooaToon-main\MooaToon-Engine-Precompiled\Windows\Engine\Binaries\Win64\UnrealEditor.exe"
+$MelodiaProjectPath = "G:\Melodia\Melodia.uproject"

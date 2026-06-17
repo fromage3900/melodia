@@ -10,6 +10,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "MelodiaBattleTypes.h"
 #include "MelodiaJRPGBridgeLibrary.generated.h"
 
 USTRUCT(BlueprintType)
@@ -79,9 +80,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Melodia|JRPG Bridge")
 	static bool TryFleeBattle(AActor* BattleController);
 
-	/** Removes Phoenix BattleUI / skill dialogs and battle cameras so Melodia native HUD owns presentation. */
+	/** Removes Phoenix BattleUI / skill dialogs. WidgetsOnly keeps units + battle camera (Strategy B). */
 	UFUNCTION(BlueprintCallable, Category="Melodia|JRPG Bridge")
-	static void TeardownPhoenixBattleUI(AActor* BattleController);
+	static void TeardownPhoenixBattleUI(AActor* BattleController, EMelodiaPhoenixTeardownScope Scope = EMelodiaPhoenixTeardownScope::Full);
+
+	/** Show live Phoenix enemy/party unit actors (after StartBattle). */
+	UFUNCTION(BlueprintCallable, Category="Melodia|JRPG Bridge")
+	static void EnsurePhoenixBattleUnitsVisible(AActor* BattleController);
+
+	/** Point the player camera at the Phoenix battle camera actor when present. */
+	UFUNCTION(BlueprintCallable, Category="Melodia|JRPG Bridge")
+	static bool ApplyPhoenixBattleCameraView(APlayerController* PlayerController, AActor* BattleController);
 
 	/** Align Phoenix playerUnits[] visibility and vitals with UMelodiaPartySubsystem roster slots. */
 	UFUNCTION(BlueprintCallable, Category="Melodia|JRPG Bridge", meta=(WorldContext="WorldContextObject"))

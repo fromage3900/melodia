@@ -15,6 +15,51 @@
 #include "MelodiaRhythmHUDWidget.h"
 #include "MelodiaSongSkillLibrary.h"
 
+namespace MelodiaBattleSessionPrivate
+{
+bool IsJRPGOnlyMode(UWorld* World)
+{
+	if (!World)
+	{
+		return false;
+	}
+
+	const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(World->GetAuthGameMode());
+	return GameMode && GameMode->bJRPGOnlyMode;
+}
+
+bool UsesRhythmHighway(UWorld* World)
+{
+	if (!World)
+	{
+		return false;
+	}
+
+	const AMelodiaRhythmGameModeBase* GameMode = Cast<AMelodiaRhythmGameModeBase>(World->GetAuthGameMode());
+	return GameMode && GameMode->bUseRhythmHighway;
+}
+
+FString PhaseDisplayName(const EMelodiaBattlePhase Phase)
+{
+	if (const UEnum* PhaseEnum = StaticEnum<EMelodiaBattlePhase>())
+	{
+		return PhaseEnum->GetDisplayNameTextByValue(static_cast<int64>(Phase)).ToString();
+	}
+
+	return TEXT("Unknown");
+}
+
+FString ResultDisplayName(const EMelodiaEncounterResult Result)
+{
+	if (const UEnum* ResultEnum = StaticEnum<EMelodiaEncounterResult>())
+	{
+		return ResultEnum->GetDisplayNameTextByValue(static_cast<int64>(Result)).ToString();
+	}
+
+	return TEXT("Unknown");
+}
+}
+
 void UMelodiaBattleSession::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -47,6 +92,55 @@ bool UMelodiaBattleSession::IsEncounterActive() const
 		&& BattlePhase != EMelodiaBattlePhase::Fled;
 }
 
+bool UMelodiaBattleSession::IsAwaitingPlayerCommand() const
+{
+	return BattlePhase == EMelodiaBattlePhase::AwaitingPlayerCommand;
+}
+
+bool UMelodiaBattleSession::IsRhythmExecutionActive() const
+{
+	if (const UMelodiaRhythmExecutionComponent* Execution = ResolveExecutionComponent())
+	{
+		return Execution->IsExecutionActive();
+	}
+
+	return BattlePhase == EMelodiaBattlePhase::RhythmExecution;
+}
+
+bool UMelodiaBattleSession::CanSubmitBasicCommand() const
+{
+	if (BattlePhase == EMelodiaBattlePhase::Victory)
+	{
+		return ResolveBattleController() && UMelodiaBattleLoopLibrary::HasRhythmVictoryResolved(ResolveBattleController());
+	}
+
+	return IsAwaitingPlayerCommand() && !IsRhythmExecutionActive();
+}
+
+bool UMelodiaBattleSession::CanSubmitUltimateCommand() const
+{
+	if (BattlePhase == EMelodiaBattlePhase::Victory)
+	{
+		return false;
+	}
+
+	AActor* Controller = ResolveBattleController();
+	return IsAwaitingPlayerCommand()
+		&& !IsRhythmExecutionActive()
+		&& Controller
+		&& UMelodiaBattleLoopLibrary::IsRhythmUltimateReady(Controller);
+}
+
+bool UMelodiaBattleSession::CanSubmitFleeCommand() const
+{
+	if (BattlePhase == EMelodiaBattlePhase::Victory)
+	{
+		return false;
+	}
+
+	return IsAwaitingPlayerCommand() && !IsRhythmExecutionActive();
+}
+
 AActor* UMelodiaBattleSession::ResolveBattleController() const
 {
 	return ActiveBattleController;
@@ -67,6 +161,12 @@ void UMelodiaBattleSession::SetBattlePhase(const EMelodiaBattlePhase NewPhase)
 
 	const EMelodiaBattlePhase PreviousPhase = BattlePhase;
 	BattlePhase = NewPhase;
+	++EncounterPhaseLogCount;
+	LastEncounterPhaseLogEntry = FString::Printf(
+		TEXT("%s -> %s"),
+		*MelodiaBattleSessionPrivate::PhaseDisplayName(PreviousPhase),
+		*MelodiaBattleSessionPrivate::PhaseDisplayName(NewPhase));
+	UE_LOG(LogTemp, Log, TEXT("Melodia battle session phase: %s"), *LastEncounterPhaseLogEntry);
 	OnBattlePhaseChanged.Broadcast(NewPhase, PreviousPhase);
 	SyncHUDMode();
 	SyncGameLoopPhase();
@@ -151,6 +251,11 @@ bool UMelodiaBattleSession::BeginEncounter(const FMelodiaEncounterDefinition& En
 		return false;
 	}
 
+	LastEncounterResult = EMelodiaEncounterResult::None;
+	CommandSubmitCount = 0;
+	EncounterPhaseLogCount = 0;
+	LastEncounterPhaseLogEntry.Reset();
+
 	ActiveEncounter = Encounter;
 	ActiveBattleController = Encounter.BattleController;
 	ActiveBattleController->SetActorHiddenInGame(false);
@@ -161,7 +266,7 @@ bool UMelodiaBattleSession::BeginEncounter(const FMelodiaEncounterDefinition& En
 		UE_LOG(LogTemp, Warning, TEXT("Melodia battle session: presenter init failed."));
 	}
 
-	UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(ActiveBattleController);
+	UMelodiaBattleLoopLibrary::ResetRhythmBattleEncounter(ActiveBattleController, Encounter.EncounterLevel);
 
 	UMelodiaJRPGBridgeLibrary::SyncPartyUnitsFromSubsystem(this, ActiveBattleController);
 
@@ -178,13 +283,15 @@ bool UMelodiaBattleSession::BeginEncounter(const FMelodiaEncounterDefinition& En
 		if (UMelodiaRhythmHUDWidget* Widget = UMelodiaRhythmHUDWidget::FindFirst(World))
 		{
 			Widget->bDrawExplorationHUD = false;
-			Widget->ShowBattleStatus(TEXT("Battle started"));
-			Widget->ShowActionPrompt(TEXT("Pick a command — Phoenix UI or 1/2/4"));
+			Widget->SetHUDMode(EMelodiaHUDMode::BattleCompact);
+			Widget->SetBattlePhaseBanner(TEXT("Battle"));
+			Widget->ShowBattleStatus(FString::Printf(TEXT("Encounter Lv%d — weakness wheel active"), Encounter.EncounterLevel));
+			Widget->ShowActionPrompt(TEXT("1=Attack | 2=Skill | R=Ultimate | Tab=cycle skill | 4/Esc=Flee"));
 		}
 	}
 
 	SetBattlePhase(EMelodiaBattlePhase::AwaitingPlayerCommand);
-	UE_LOG(LogTemp, Log, TEXT("Melodia battle session began encounter on %s."), *ActiveBattleController->GetName());
+	UE_LOG(LogTemp, Log, TEXT("Melodia battle session: encounter begin on %s (level %d)."), *ActiveBattleController->GetName(), Encounter.EncounterLevel);
 	return true;
 }
 
@@ -192,6 +299,11 @@ bool UMelodiaBattleSession::SubmitLoopCommand(const EMelodiaRhythmBattleCommand 
 {
 	AActor* Controller = ResolveBattleController();
 	if (!Controller || !IsEncounterActive())
+	{
+		return false;
+	}
+
+	if (BattlePhase != EMelodiaBattlePhase::AwaitingPlayerCommand)
 	{
 		return false;
 	}
@@ -205,9 +317,9 @@ bool UMelodiaBattleSession::SubmitLoopCommand(const EMelodiaRhythmBattleCommand 
 	}
 
 	const bool bSucceeded = UMelodiaBattleLoopLibrary::ExecuteRhythmBattleCommand(this, Controller, Command, Grade, 3);
-	if (bSucceeded && Command != EMelodiaRhythmBattleCommand::Ultimate)
+	if (bSucceeded)
 	{
-		SetBattlePhase(EMelodiaBattlePhase::AwaitingPlayerCommand);
+		++CommandSubmitCount;
 	}
 
 	if (UMelodiaBattleLoopLibrary::HasRhythmVictoryResolved(Controller))
@@ -217,6 +329,10 @@ bool UMelodiaBattleSession::SubmitLoopCommand(const EMelodiaRhythmBattleCommand 
 	else if (UMelodiaBattleLoopLibrary::IsPartyDefeated(Controller))
 	{
 		EndEncounter(EMelodiaEncounterResult::Defeat);
+	}
+	else if (bSucceeded && Command != EMelodiaRhythmBattleCommand::Ultimate)
+	{
+		SetBattlePhase(EMelodiaBattlePhase::AwaitingPlayerCommand);
 	}
 
 	return bSucceeded;
@@ -251,6 +367,45 @@ bool UMelodiaBattleSession::SubmitSkillCommand(const FName SkillId)
 		return false;
 	}
 
+	// HSR / traditional: resolve skill immediately with element + power from recipe.
+	if (!MelodiaBattleSessionPrivate::UsesRhythmHighway(GetWorld()))
+	{
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+			{
+				Progression->State.ActiveSkillId = SkillId;
+			}
+		}
+
+		FMelodiaSongSkillRecipe Recipe;
+		if (!UMelodiaSongSkillLibrary::ResolveSongSkill(this, SkillId, Recipe))
+		{
+			return false;
+		}
+
+		const bool bResolved = UMelodiaBattleLoopLibrary::ExecuteInstantSkillRecipe(this, Controller, Recipe, 1.0f);
+		if (bResolved)
+		{
+			++CommandSubmitCount;
+		}
+
+		if (UMelodiaBattleLoopLibrary::HasRhythmVictoryResolved(Controller))
+		{
+			SetBattlePhase(EMelodiaBattlePhase::Victory);
+		}
+		else if (UMelodiaBattleLoopLibrary::IsPartyDefeated(Controller))
+		{
+			EndEncounter(EMelodiaEncounterResult::Defeat);
+		}
+		else if (bResolved)
+		{
+			SetBattlePhase(EMelodiaBattlePhase::AwaitingPlayerCommand);
+		}
+
+		return bResolved;
+	}
+
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
@@ -277,6 +432,7 @@ bool UMelodiaBattleSession::SubmitSkillCommand(const FName SkillId)
 	}
 
 	NotifyRhythmExecutionStarted();
+	++CommandSubmitCount;
 
 	if (UWorld* World = GetWorld())
 	{
@@ -331,7 +487,7 @@ bool UMelodiaBattleSession::IsSkillUnlocked(const FName SkillId) const
 
 bool UMelodiaBattleSession::CanSubmitSkillCommand(const FName SkillId) const
 {
-	if (SkillId.IsNone() || !IsEncounterActive())
+	if (SkillId.IsNone() || !IsAwaitingPlayerCommand() || IsRhythmExecutionActive())
 	{
 		return false;
 	}
@@ -342,7 +498,19 @@ bool UMelodiaBattleSession::CanSubmitSkillCommand(const FName SkillId) const
 	}
 
 	AActor* Controller = ResolveBattleController();
-	return Controller && UMelodiaBattleLoopLibrary::CanUseRhythmSkill(Controller);
+	if (!Controller)
+	{
+		return false;
+	}
+
+	FMelodiaSongSkillRecipe Recipe;
+	if (!UMelodiaSongSkillLibrary::ResolveSongSkill(this, SkillId, Recipe))
+	{
+		return false;
+	}
+
+	const int32 SkillCost = Recipe.SPCostOverride > 0 ? Recipe.SPCostOverride : 1;
+	return UMelodiaBattleLoopLibrary::GetRhythmSkillPoints(Controller) >= SkillCost;
 }
 
 bool UMelodiaBattleSession::SubmitUltimateCommand()
@@ -360,11 +528,26 @@ bool UMelodiaBattleSession::SubmitUltimateCommand()
 		}
 	}
 
-	const bool bTriggered = UMelodiaBattleLoopLibrary::TriggerRhythmUltimate(this, ResolveBattleController());
-	if (bTriggered && UMelodiaBattleLoopLibrary::HasRhythmVictoryResolved(ResolveBattleController()))
+	AActor* Controller = ResolveBattleController();
+	const bool bTriggered = UMelodiaBattleLoopLibrary::TriggerRhythmUltimate(this, Controller);
+	if (bTriggered)
+	{
+		++CommandSubmitCount;
+	}
+
+	if (UMelodiaBattleLoopLibrary::HasRhythmVictoryResolved(Controller))
 	{
 		SetBattlePhase(EMelodiaBattlePhase::Victory);
 	}
+	else if (UMelodiaBattleLoopLibrary::IsPartyDefeated(Controller))
+	{
+		EndEncounter(EMelodiaEncounterResult::Defeat);
+	}
+	else if (bTriggered)
+	{
+		SetBattlePhase(EMelodiaBattlePhase::AwaitingPlayerCommand);
+	}
+
 	return bTriggered;
 }
 
@@ -393,6 +576,7 @@ bool UMelodiaBattleSession::SubmitFleeCommand()
 	const bool bFled = UMelodiaBattleLoopLibrary::TryFleeRhythmBattle(this, Controller);
 	if (bFled)
 	{
+		++CommandSubmitCount;
 		EndEncounter(EMelodiaEncounterResult::Fled);
 	}
 	return bFled;
@@ -412,6 +596,15 @@ bool UMelodiaBattleSession::ConfirmVictoryReward()
 	}
 
 	UMelodiaBattleLoopLibrary::ConfirmRhythmVictoryReward(Controller);
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UMelodiaMechanicProgressionSubsystem* Progression = GI->GetSubsystem<UMelodiaMechanicProgressionSubsystem>())
+		{
+			Progression->SaveToDefaultSlot(TEXT("Battle victory"));
+		}
+	}
+
 	EndEncounter(EMelodiaEncounterResult::Victory);
 	return true;
 }
@@ -436,10 +629,30 @@ void UMelodiaBattleSession::NotifyRhythmExecutionFinished()
 
 void UMelodiaBattleSession::EndEncounter(const EMelodiaEncounterResult Result)
 {
-	(void)Result;
+	LastEncounterResult = Result;
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("Melodia battle session: clean exit (%s) after %d commands, %d phase transitions."),
+		*MelodiaBattleSessionPrivate::ResultDisplayName(Result),
+		CommandSubmitCount,
+		EncounterPhaseLogCount);
 
 	if (ActiveBattleController)
 	{
+		if (UMelodiaRhythmExecutionComponent* Execution = ResolveExecutionComponent())
+		{
+			if (Execution->IsExecutionActive())
+			{
+				Execution->CancelExecution();
+			}
+		}
+
+		if (Result == EMelodiaEncounterResult::Defeat)
+		{
+			UMelodiaJRPGBridgeLibrary::RestorePartyVitals(ActiveBattleController);
+		}
+
 		UMelodiaJRPGPresenter::TeardownPresentation(ActiveBattleController);
 	}
 
