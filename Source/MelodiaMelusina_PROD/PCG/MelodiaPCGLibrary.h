@@ -10,9 +10,11 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "PCGMelodiaAttributes.h"
+#include "MelodiaBezierTypes.h"
 #include "MelodiaPCGLibrary.generated.h"
 
 class UPCGComponent;
+class UPCGGraph;
 class UPCGPointData;
 class UPCGMetadata;
 class AMelodiaPCGWalkableIndex;
@@ -126,6 +128,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG",
 		meta = (WorldContext = "WorldContextObject"))
 	static AMelodiaPCGEncounterSpawner* FindEncounterSpawner(const UObject* WorldContextObject);
+
+	// -----------------------------------------------------------------
+	// Graph assignment / generation (level building)
+	// -----------------------------------------------------------------
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Graph")
+	static bool AssignGraphToComponent(UPCGComponent* PCGComponent, const FSoftObjectPath& GraphAssetPath, int32 Seed = 0);
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Graph")
+	static bool GeneratePCGComponent(UPCGComponent* PCGComponent, bool bForce = true);
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Graph")
+	static UPCGGraph* LoadPCGGraph(const FSoftObjectPath& GraphAssetPath);
 
 	// -----------------------------------------------------------------
 	// Internal helpers (C++ only — not exposed to Blueprint)

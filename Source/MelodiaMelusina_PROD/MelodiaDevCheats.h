@@ -18,4 +18,6 @@ namespace MelodiaDevCheats
 	void WinBattle(UWorld* World);
 	void PlayDemo(UWorld* World);
 	void PlayPCGDemo(UWorld* World);
+	void PlayPortfolioBezier(UWorld* World);
+	void BuildPCGGraphs();
 }

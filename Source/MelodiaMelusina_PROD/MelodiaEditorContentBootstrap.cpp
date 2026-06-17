@@ -2,6 +2,8 @@
 
 #if WITH_EDITOR
 
+#include "MelodiaPCGEditorLibrary.h"
+
 #include "Containers/Ticker.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
@@ -57,6 +59,8 @@ void UMelodiaEditorContentBootstrap::Initialize(FSubsystemCollectionBase& Collec
 			UMelodiaEditorContentBootstrap::EnsureTestLoopLevelAsset();
 			UMelodiaEditorContentBootstrap::RepopulateGameplayLoopTestLevel();
 			UMelodiaEditorContentBootstrap::EnsurePCGDemoLevelAsset();
+			UMelodiaEditorContentBootstrap::EnsurePortfolioTerraceLevelAsset();
+			UMelodiaPCGEditorLibrary::EnsureBezierTestLevels();
 			UMelodiaEditorContentBootstrap::EnsureMelodiaPortfolioMenuBridge();
 			return false;
 		}),
@@ -642,6 +646,100 @@ bool UMelodiaEditorContentBootstrap::RepopulatePCGDemoLevel()
 	if (bSaved)
 	{
 		UE_LOG(LogTemp, Log, TEXT("Melodia editor bootstrap saved PCG demo level %s."), *MapAssetPath);
+	}
+	return bSaved;
+}
+
+bool UMelodiaEditorContentBootstrap::EnsurePortfolioTerraceLevelAsset()
+{
+	const FString DestPath = TEXT("/Game/Melodia/Levels/L_MelodiaPortfolioTerrace");
+	const FString SourcePath = TEXT("/Game/_PROJECT/PCG/TestLevels/L_PCGTest_Greybox");
+
+	EnsureContentFolder(TEXT("/Game/Melodia/Levels"));
+
+	if (!UEditorAssetLibrary::DoesAssetExist(DestPath))
+	{
+		if (!UEditorAssetLibrary::DoesAssetExist(SourcePath))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Melodia editor bootstrap: missing source greybox map %s."), *SourcePath);
+			return false;
+		}
+
+		if (!UEditorAssetLibrary::DuplicateAsset(SourcePath, DestPath))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Melodia editor bootstrap: failed to duplicate %s to %s."), *SourcePath, *DestPath);
+			return false;
+		}
+
+		UE_LOG(LogTemp, Log, TEXT("Melodia editor bootstrap created portfolio terrace level %s."), *DestPath);
+	}
+
+	return RepopulatePortfolioTerraceLevel();
+}
+
+bool UMelodiaEditorContentBootstrap::RepopulatePortfolioTerraceLevel()
+{
+	const FString MapAssetPath = TEXT("/Game/Melodia/Levels/L_MelodiaPortfolioTerrace");
+	if (!UEditorAssetLibrary::DoesAssetExist(MapAssetPath) || !GEditor)
+	{
+		return false;
+	}
+
+	const FString MapFilename = FPackageName::LongPackageNameToFilename(MapAssetPath, FPackageName::GetMapPackageExtension());
+	if (!FEditorFileUtils::LoadMap(MapFilename, false, true))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Melodia editor bootstrap: failed to load %s for portfolio repopulation."), *MapAssetPath);
+		return false;
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	bool bTouched = false;
+
+	bool bHasPlayerStart = false;
+	for (TActorIterator<APlayerStart> It(World); It; ++It)
+	{
+		bHasPlayerStart = true;
+		break;
+	}
+	if (!bHasPlayerStart)
+	{
+		World->SpawnActor<APlayerStart>(
+			APlayerStart::StaticClass(),
+			FVector(-2400.0f, -1800.0f, 140.0f),
+			FRotator(0.0f, 35.0f, 0.0f),
+			Params);
+		bTouched = true;
+	}
+
+	if (AWorldSettings* WorldSettings = World->GetWorldSettings())
+	{
+		if (UClass* GameModeClass = LoadClass<AGameModeBase>(nullptr, TEXT("/Game/Melodia/Core/BP_MelodiaRhythmGameMode.BP_MelodiaRhythmGameMode_C")))
+		{
+			if (WorldSettings->DefaultGameMode != GameModeClass)
+			{
+				WorldSettings->DefaultGameMode = GameModeClass;
+				bTouched = true;
+			}
+		}
+	}
+
+	if (!bTouched)
+	{
+		return false;
+	}
+
+	const bool bSaved = FEditorFileUtils::SaveLevel(World->PersistentLevel, MapFilename);
+	if (bSaved)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Melodia editor bootstrap saved portfolio terrace level %s."), *MapAssetPath);
 	}
 	return bSaved;
 }

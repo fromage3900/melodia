@@ -121,6 +121,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|PCG")
 	bool bPCGDemoMap = false;
 
+	/** Bezier portfolio hero: PCG_PortfolioTerraceBezier graph + terrace walk placement. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|PCG")
+	bool bPortfolioBezierMap = false;
+
 	/** When true, do not relocate level-placed encounter/rest/portal actors (test director owns layout). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Melodia|Loop")
 	bool bPreferLevelPlacedLoopActors = false;
@@ -248,6 +252,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Melodia|PCG")
 	void ConfigurePCGDemo();
 
+	UFUNCTION(BlueprintCallable, Category="Melodia|PCG")
+	void ConfigurePortfolioBezierDemo();
+
 	/** Called by ReverieRunManager after PCG area generation finishes. */
 	UFUNCTION(BlueprintCallable, Category="Melodia|PCG")
 	void NotifyReverieAreaGenerationComplete();
@@ -312,6 +319,7 @@ protected:
 	void EnsureProgressionNPCs();
 	void EnsureReverieRunManager();
 	void ConfigurePCGDemoReverieManager();
+	void ConfigurePortfolioBezierReverieManager();
 	void StartPCGDemoRun();
 	void EnsureWorldInteractions();
 	void EnsurePortfolioFlowers();

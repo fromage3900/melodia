@@ -89,6 +89,11 @@ void AMelodiaRhythmGameModeBase::InitGame(const FString& MapName, const FString&
 	{
 		ConfigurePCGDemo();
 	}
+	else if (FParse::Param(*Options, TEXT("PortfolioBezier"))
+		|| MapName.Contains(TEXT("MelodiaPortfolioTerrace"), ESearchCase::IgnoreCase))
+	{
+		ConfigurePortfolioBezierDemo();
+	}
 }
 
 void AMelodiaRhythmGameModeBase::RestartPlayer(AController* NewPlayer)
@@ -192,7 +197,14 @@ void AMelodiaRhythmGameModeBase::BeginPlay()
 		EnsureReverieRunManager();
 		if (bPCGDemoMap)
 		{
-			ConfigurePCGDemoReverieManager();
+			if (bPortfolioBezierMap)
+			{
+				ConfigurePortfolioBezierReverieManager();
+			}
+			else
+			{
+				ConfigurePCGDemoReverieManager();
+			}
 			StartPCGDemoRun();
 		}
 		EnsurePCGGameplayPlacement();
@@ -1535,6 +1547,7 @@ void AMelodiaRhythmGameModeBase::ConfigureGameplayLoopTest(const FVector& Player
 void AMelodiaRhythmGameModeBase::ConfigurePCGDemo()
 {
 	bPCGDemoMap = true;
+	bPortfolioBezierMap = false;
 	bGameplayLoopTestMap = false;
 	bPreferLevelPlacedLoopActors = false;
 	bUsePCGPlacement = true;
@@ -1542,6 +1555,14 @@ void AMelodiaRhythmGameModeBase::ConfigurePCGDemo()
 	ExplorationReturnLocation = FVector(0.0f, 0.0f, 120.0f);
 	EncounterTriggerLocation = FVector(800.0f, 0.0f, 120.0f);
 	PCGPlacementSearchRadius = 20000.0f;
+}
+
+void AMelodiaRhythmGameModeBase::ConfigurePortfolioBezierDemo()
+{
+	ConfigurePCGDemo();
+	bPortfolioBezierMap = true;
+	ExplorationReturnLocation = FVector(-2400.0f, -1800.0f, 140.0f);
+	EncounterTriggerLocation = FVector(2800.0f, 2000.0f, 320.0f);
 }
 
 void AMelodiaRhythmGameModeBase::NotifyReverieAreaGenerationComplete()
@@ -1588,6 +1609,29 @@ void AMelodiaRhythmGameModeBase::ConfigurePCGDemoReverieManager()
 		TerraceGarden.DifficultyMultiplier = 1.0f;
 		ActiveReverieRunManager->AreaTemplates.Add(TerraceGarden);
 	}
+}
+
+void AMelodiaRhythmGameModeBase::ConfigurePortfolioBezierReverieManager()
+{
+	if (!ActiveReverieRunManager)
+	{
+		return;
+	}
+
+	ActiveReverieRunManager->bAutoGenerateOnBeginPlay = false;
+	ActiveReverieRunManager->AreasPerRun = 1;
+	ActiveReverieRunManager->RunSeed = 42;
+
+	FReverieAreaConfig PortfolioTerrace;
+	PortfolioTerrace.AreaDisplayName = TEXT("Portfolio Bezier Terrace");
+	PortfolioTerrace.PCGGraphAsset = FSoftObjectPath(
+		TEXT("/Game/_PROJECT/PCG/Graphs/PCG_PortfolioTerraceBezier.PCG_PortfolioTerraceBezier"));
+	PortfolioTerrace.MinEncounters = 1;
+	PortfolioTerrace.MaxEncounters = 1;
+	PortfolioTerrace.DifficultyMultiplier = 1.0f;
+
+	ActiveReverieRunManager->AreaTemplates.Reset();
+	ActiveReverieRunManager->AreaTemplates.Add(PortfolioTerrace);
 }
 
 void AMelodiaRhythmGameModeBase::StartPCGDemoRun()

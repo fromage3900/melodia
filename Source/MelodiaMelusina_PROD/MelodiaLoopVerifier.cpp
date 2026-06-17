@@ -718,7 +718,8 @@ bool AMelodiaLoopVerifier::VerifyPCGGraphs(FString& Detail)
 			if (ClassName.Contains(TEXT("Escher")) ||
 				ClassName.Contains(TEXT("GravityZone")) ||
 				ClassName.Contains(TEXT("RecursiveArch")) ||
-				ClassName.Contains(TEXT("Tessellation")))
+				ClassName.Contains(TEXT("Tessellation")) ||
+				ClassName.Contains(TEXT("Bezier")))
 			{
 				++CustomElementsFound;
 			}

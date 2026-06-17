@@ -210,6 +210,10 @@ FPCGElementTestResult AMelodiaPCGTestHarness::TestPCGComponent(UPCGComponent* PC
 		{
 			bValid = ValidateTessellation(BI.Points, BI.Meta, Result.FailureReason);
 		}
+		else if (Result.ElementName.Contains(TEXT("Bezier")) || Result.ElementName.Contains(TEXT("Portfolio")))
+		{
+			bValid = ValidateBezierPath(BI.Points, BI.Meta, Result.FailureReason);
+		}
 		else
 		{
 			// Unknown element — pass if it has points.
@@ -228,7 +232,9 @@ FPCGElementTestResult AMelodiaPCGTestHarness::TestPCGComponent(UPCGComponent* PC
 		!Result.ElementName.Contains(TEXT("Gravity")) &&
 		!Result.ElementName.Contains(TEXT("RecursiveArch")) &&
 		!Result.ElementName.Contains(TEXT("Arch")) &&
-		!Result.ElementName.Contains(TEXT("Tessellation")))
+		!Result.ElementName.Contains(TEXT("Tessellation")) &&
+		!Result.ElementName.Contains(TEXT("Bezier")) &&
+		!Result.ElementName.Contains(TEXT("Portfolio")))
 	{
 		bValid = (Result.PointCount > 0 && Result.WalkableCount > 0);
 		if (!bValid)
@@ -432,6 +438,53 @@ bool AMelodiaPCGTestHarness::ValidateTessellation(
 			OutReason = TEXT("Tessellation: point has Walkable=false");
 			return false;
 		}
+	}
+
+	return true;
+}
+
+bool AMelodiaPCGTestHarness::ValidateBezierPath(
+	const TArray<FPCGPoint>& Points,
+	UPCGMetadata* Meta,
+	FString& OutReason)
+{
+	if (Points.Num() < 4)
+	{
+		OutReason = TEXT("Bezier: too few points (need >= 4)");
+		return false;
+	}
+
+	const FPCGMetadataAttribute<float>* PathAttr =
+		Meta->GetConstTypedAttribute<float>(FMelodiaPCGAttrs::PathParamAttr);
+	if (!PathAttr)
+	{
+		OutReason = TEXT("Bezier: missing PathParam attribute");
+		return false;
+	}
+
+	const FPCGMetadataAttribute<int32>* RoleAttr =
+		Meta->GetConstTypedAttribute<int32>(FMelodiaPCGAttrs::ArchitecturalRoleAttr);
+	if (!RoleAttr)
+	{
+		OutReason = TEXT("Bezier: missing ArchitecturalRole attribute");
+		return false;
+	}
+
+	int32 WalkableCount = 0;
+	const FPCGMetadataAttribute<bool>* WalkAttr =
+		Meta->GetConstTypedAttribute<bool>(FMelodiaPCGAttrs::WalkableAttr);
+	for (const FPCGPoint& Pt : Points)
+	{
+		if (WalkAttr && WalkAttr->GetValueFromItemKey(Pt.MetadataEntry))
+		{
+			++WalkableCount;
+		}
+	}
+
+	if (WalkableCount == 0)
+	{
+		OutReason = TEXT("Bezier: no walkable points in output block");
+		return false;
 	}
 
 	return true;

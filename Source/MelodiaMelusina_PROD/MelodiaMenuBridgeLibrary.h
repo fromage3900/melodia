@@ -19,6 +19,9 @@ public:
 	static void LaunchPCGDemo(UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Menu", meta = (WorldContext = "WorldContextObject"))
+	static void LaunchPortfolioBezierDemo(UObject* WorldContextObject);
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Menu", meta = (WorldContext = "WorldContextObject"))
 	static void LaunchMainMenu(UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintPure, Category = "Melodia|Menu")
@@ -26,6 +29,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Melodia|Menu")
 	static FName GetPCGDemoMapName();
+
+	UFUNCTION(BlueprintPure, Category = "Melodia|Menu")
+	static FName GetPortfolioBezierMapName();
 
 	UFUNCTION(BlueprintPure, Category = "Melodia|Menu")
 	static FName GetOGMainMenuMapName();

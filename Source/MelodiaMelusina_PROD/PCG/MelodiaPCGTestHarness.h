@@ -117,6 +117,11 @@ private:
 		UPCGMetadata* Meta,
 		FString& OutReason);
 
+	bool ValidateBezierPath(
+		const TArray<FPCGPoint>& Points,
+		UPCGMetadata* Meta,
+		FString& OutReason);
+
 	/** Spawn a debug sphere at a location. */
 	void SpawnDebugMarker(const FVector& Location, FLinearColor Color);
 

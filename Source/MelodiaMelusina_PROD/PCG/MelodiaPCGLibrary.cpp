@@ -2,6 +2,7 @@
 // Shared Blueprint function library for querying PCG-generated data at runtime.
 
 #include "MelodiaPCGLibrary.h"
+#include "MelodiaPCGGraphRegistry.h"
 
 #include "MelodiaPCGWalkableIndex.h"
 #include "../MelodiaPCGEncounterSpawner.h"
@@ -394,4 +395,43 @@ AMelodiaPCGEncounterSpawner* UMelodiaPCGLibrary::FindEncounterSpawner(const UObj
 		return *It;
 	}
 	return nullptr;
+}
+
+UPCGGraph* UMelodiaPCGLibrary::LoadPCGGraph(const FSoftObjectPath& GraphAssetPath)
+{
+	if (GraphAssetPath.IsNull())
+	{
+		return nullptr;
+	}
+	return Cast<UPCGGraph>(GraphAssetPath.TryLoad());
+}
+
+bool UMelodiaPCGLibrary::AssignGraphToComponent(UPCGComponent* PCGComponent, const FSoftObjectPath& GraphAssetPath, int32 Seed)
+{
+	if (!PCGComponent)
+	{
+		return false;
+	}
+
+	UPCGGraph* Graph = LoadPCGGraph(GraphAssetPath);
+	if (!Graph)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("MelodiaPCG: failed to load graph %s"), *GraphAssetPath.ToString());
+		return false;
+	}
+
+	PCGComponent->SetGraph(Graph);
+	PCGComponent->Seed = Seed;
+	return true;
+}
+
+bool UMelodiaPCGLibrary::GeneratePCGComponent(UPCGComponent* PCGComponent, bool bForce)
+{
+	if (!PCGComponent)
+	{
+		return false;
+	}
+
+	PCGComponent->Generate(bForce);
+	return true;
 }

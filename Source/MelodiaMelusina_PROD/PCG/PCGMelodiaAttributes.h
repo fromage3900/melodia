@@ -57,4 +57,13 @@ namespace FMelodiaPCGAttrs
 
 	/** int32 — tile type (0 = square/fat, 1 = thin rhombus). */
 	static const FName TileTypeAttr(TEXT("TileType"));
+
+	/** float — normalized position along a Bezier path (0 = start, 1 = end). */
+	static const FName PathParamAttr(TEXT("PathParam"));
+
+	/** int32 — index of the Bezier segment this point was sampled from. */
+	static const FName BezierSegmentAttr(TEXT("BezierSegment"));
+
+	/** FVector — unit tangent along the path at this sample (for sweep / facing). */
+	static const FName PathTangentAttr(TEXT("PathTangent"));
 }

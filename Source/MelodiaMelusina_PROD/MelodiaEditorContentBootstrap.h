@@ -35,6 +35,12 @@ public:
 	static bool RepopulatePCGDemoLevel();
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
+	static bool EnsurePortfolioTerraceLevelAsset();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
+	static bool RepopulatePortfolioTerraceLevel();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|Content")
 	static bool EnsureMelodiaPortfolioMenuBridge();
 
 private:

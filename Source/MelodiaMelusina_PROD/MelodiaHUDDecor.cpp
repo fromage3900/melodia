@@ -107,12 +107,7 @@ const FSlateBrush* FindDecorBrush(const TCHAR* FileName)
 	return nullptr;
 }
 
-FVector2f V2f(const float X, const float Y)
-{
-	return FVector2f(X, Y);
-}
-
-FPaintGeometry PaintBox(const FGeometry& Geometry, const FVector2f Position, const FVector2f Size)
+FPaintGeometry DecorPaintBox(const FGeometry& Geometry, const FVector2f Position, const FVector2f Size)
 {
 	return Geometry.ToPaintGeometry(Size, FSlateLayoutTransform(Position));
 }
@@ -176,7 +171,7 @@ void MelodiaHUDDecor::PaintDecorImage(
 	FSlateDrawElement::MakeBox(
 		OutDrawElements,
 		LayerId,
-		PaintBox(Geometry, Position, Size),
+		DecorPaintBox(Geometry, Position, Size),
 		Brush,
 		ESlateDrawEffect::None,
 		Tint);

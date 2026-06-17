@@ -23,6 +23,12 @@ void UMelodiaMenuBridgeLibrary::LaunchPCGDemo(UObject* WorldContextObject)
 	UGameplayStatics::OpenLevel(WorldContextObject, GetPCGDemoMapName(), true, Options);
 }
 
+void UMelodiaMenuBridgeLibrary::LaunchPortfolioBezierDemo(UObject* WorldContextObject)
+{
+	static const FString Options = MelodiaMenuBridgePrivate::GameModeOptions + TEXT("?PortfolioBezier");
+	UGameplayStatics::OpenLevel(WorldContextObject, GetPortfolioBezierMapName(), true, Options);
+}
+
 void UMelodiaMenuBridgeLibrary::LaunchMainMenu(UObject* WorldContextObject)
 {
 	UGameplayStatics::OpenLevel(WorldContextObject, GetOGMainMenuMapName());
@@ -36,6 +42,11 @@ FName UMelodiaMenuBridgeLibrary::GetGameplayLoopTestMapName()
 FName UMelodiaMenuBridgeLibrary::GetPCGDemoMapName()
 {
 	return FName(TEXT("L_MelodiaPCGDemo"));
+}
+
+FName UMelodiaMenuBridgeLibrary::GetPortfolioBezierMapName()
+{
+	return FName(TEXT("L_MelodiaPortfolioTerrace"));
 }
 
 FName UMelodiaMenuBridgeLibrary::GetOGMainMenuMapName()

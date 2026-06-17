@@ -14,6 +14,10 @@
 #include "MelodiaCombatStateComponent.h"
 #include "MelodiaJRPGBridgeLibrary.h"
 #include "MelodiaMenuBridgeLibrary.h"
+
+#if WITH_EDITOR
+#include "MelodiaPCGEditorLibrary.h"
+#endif
 #include "MelodiaMechanicProgressionSubsystem.h"
 #include "MelodiaRhythmGameModeBase.h"
 
@@ -210,6 +214,25 @@ void MelodiaDevCheats::PlayPCGDemo(UWorld* World)
 	UE_LOG(LogTemp, Log, TEXT("Melodia.PlayPCGDemo: opening L_MelodiaPCGDemo (Terrace Garden PCG)."));
 }
 
+void MelodiaDevCheats::PlayPortfolioBezier(UWorld* World)
+{
+	UMelodiaMenuBridgeLibrary::LaunchPortfolioBezierDemo(World);
+	UE_LOG(LogTemp, Log, TEXT("Melodia.PlayPortfolioBezier: opening L_MelodiaPortfolioTerrace (Bezier terrace portfolio)."));
+}
+
+void MelodiaDevCheats::BuildPCGGraphs()
+{
+#if WITH_EDITOR
+	UMelodiaPCGEditorLibrary::PrintPCGGraphCatalogHelp();
+	if (UMelodiaPCGEditorLibrary::BuildAllBezierGraphs())
+	{
+		UMelodiaPCGEditorLibrary::EnsureBezierTestLevels();
+	}
+#else
+	UE_LOG(LogTemp, Warning, TEXT("Melodia.BuildPCGGraphs is editor-only."));
+#endif
+}
+
 void MelodiaDevCheats::RegisterConsoleCommands()
 {
 	using namespace MelodiaDevCheatsPrivate;
@@ -260,6 +283,18 @@ void MelodiaDevCheats::RegisterConsoleCommands()
 		TEXT("Open the Melodia PCG Terrace Garden demo (procedural environment + gameplay loop)."),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World) { MelodiaDevCheats::PlayPCGDemo(World); }),
 		ECVF_Cheat);
+
+	IConsoleManager::Get().RegisterConsoleCommand(
+		TEXT("Melodia.PlayPortfolioBezier"),
+		TEXT("Open the Melodia Bezier terrace portfolio map (environment art reel capture)."),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World) { MelodiaDevCheats::PlayPortfolioBezier(World); }),
+		ECVF_Cheat);
+
+	IConsoleManager::Get().RegisterConsoleCommand(
+		TEXT("Melodia.BuildPCGGraphs"),
+		TEXT("Build all Melodia Bezier PCG graphs from catalog (editor only; requires Python plugin)."),
+		FConsoleCommandDelegate::CreateStatic(&MelodiaDevCheats::BuildPCGGraphs),
+		ECVF_Default);
 
 	UE_LOG(LogTemp, Log, TEXT("Melodia dev cheats registered (~ key console in PIE)."));
 }
