@@ -5,6 +5,7 @@
 #include "MelodiaPCGEditorLibrary.h"
 
 #include "Containers/Ticker.h"
+#include "Misc/ConfigCacheIni.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
 #include "EditorAssetLibrary.h"
@@ -39,6 +40,22 @@
 void UMelodiaEditorContentBootstrap::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+
+	// The content bootstrap auto-creates and repopulates/SAVES demo & portfolio levels on every
+	// editor launch (PCG regeneration + .umap re-save = per-launch churn, and a "portfolio system"
+	// that was never wanted). It is now OFF by default. Re-enable by adding to Config/DefaultEditor.ini:
+	//   [/Script/MelodiaMelusina_PROD.MelodiaEditorContentBootstrap]
+	//   bEnableAutoBootstrap=True
+	bool bEnableAutoBootstrap = false;
+	if (GConfig)
+	{
+		GConfig->GetBool(TEXT("/Script/MelodiaMelusina_PROD.MelodiaEditorContentBootstrap"), TEXT("bEnableAutoBootstrap"), bEnableAutoBootstrap, GEditorIni);
+	}
+	if (!bEnableAutoBootstrap)
+	{
+		UE_LOG(LogTemp, Log, TEXT("MelodiaEditorContentBootstrap: auto-bootstrap disabled (no demo/portfolio content regeneration this session)."));
+		return;
+	}
 
 	// Editor startup can crash if we create/save assets before engine startup module loading completes
 	// (AssetRegistry may be unable to tick/complete yet). Defer until the editor is fully initialized.
