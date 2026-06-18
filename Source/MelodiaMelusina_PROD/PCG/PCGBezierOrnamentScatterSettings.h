@@ -50,6 +50,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ornament Scatter")
 	EPCGArchitecturalRole OrnamentRole = EPCGArchitecturalRole::Ornament;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	FMelodiaPCGTerrainProjection TerrainProjection;
+
 	virtual FPCGElementPtr CreateElement() const override;
 };
 

@@ -137,7 +137,11 @@ public:
 	static bool AssignGraphToComponent(UPCGComponent* PCGComponent, const FSoftObjectPath& GraphAssetPath, int32 Seed = 0);
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Graph")
-	static bool GeneratePCGComponent(UPCGComponent* PCGComponent, bool bForce = true);
+	static bool GeneratePCGComponent(UPCGComponent* PCGComponent, bool bForce = true, float MaxWaitSeconds = 30.f);
+
+	/** Sum ISM instance counts on an actor (includes PCG-managed components). */
+	UFUNCTION(BlueprintPure, Category = "Melodia|PCG|Graph")
+	static int32 CountInstancedMeshInstances(const AActor* Actor);
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Graph")
 	static UPCGGraph* LoadPCGGraph(const FSoftObjectPath& GraphAssetPath);

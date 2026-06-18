@@ -47,6 +47,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bezier Colonnade")
 	EPCGArchitecturalRole ColumnRole = EPCGArchitecturalRole::Column;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	FMelodiaPCGTerrainProjection TerrainProjection;
+
 	virtual FPCGElementPtr CreateElement() const override;
 };
 

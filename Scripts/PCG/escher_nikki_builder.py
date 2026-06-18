@@ -101,23 +101,32 @@ def add_node_or_fallback(graph, primary: str, fallback: str, x: int, y: int):
     return node, settings, used
 
 
+def _main_input_pin(node) -> str:
+    labels = pin_labels(node.get_editor_property("input_pins"))
+    for preferred in ("Paths", "Splines", "Seeds", "Vtx", "Surface", "Volume", "Source", "In"):
+        if preferred in labels:
+            return preferred
+    return labels[0] if labels else "In"
+
+
+def _main_output_pin(node) -> str:
+    labels = pin_labels(node.get_editor_property("output_pins"))
+    for preferred in ("Paths", "Out", "Vtx"):
+        if preferred in labels:
+            return preferred
+    return labels[0] if labels else "Out"
+
+
+def wire_output_to_input(graph, src_node, dst_node) -> None:
+    graph.add_edge(src_node, _main_output_pin(src_node), dst_node, _main_input_pin(dst_node))
+
+
 def wire_chain(graph, nodes: list, output_node) -> None:
     input_node = graph.get_input_node()
     graph.add_edge(input_node, "In", nodes[0], _main_input_pin(nodes[0]))
     for a, b in zip(nodes, nodes[1:]):
-        graph.add_edge(a, "Out", b, _main_input_pin(b))
-    graph.add_edge(nodes[-1], "Out", output_node, "Out")
-
-
-def _main_input_pin(node) -> str:
-    labels = pin_labels(node.get_editor_property("input_pins"))
-    if "Surface" in labels:
-        return "Surface"
-    if "Volume" in labels:
-        return "Volume"
-    if "Source" in labels and "In" not in labels:
-        return "Source"
-    return "In"
+        wire_output_to_input(graph, a, b)
+    graph.add_edge(nodes[-1], _main_output_pin(nodes[-1]), output_node, "Out")
 
 
 def mesh_entry(static_mesh_path: str, weight: int = 1):

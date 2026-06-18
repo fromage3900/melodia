@@ -1,6 +1,18 @@
 {
-  "version": "2026-06-15",
-  "description": "Melusina baroque architecture mesh palette for PCGEx mesh collections. Canonical paths under /Game/_PROJECT/. Prefer MelusinasHouse duplicates when both exist.",
+  "version": "2026-06-18",
+  "description": "Melusina baroque architecture mesh palette for PCGEx mesh collections. Portfolio mode (melodia_pcg_standards.PORTFOLIO_PLACEHOLDER_MODE) uses ONE mesh per role — see portfolio_placeholders.",
+  "portfolio_placeholders": {
+    "enabled_by": "melodia_pcg_standards.PORTFOLIO_PLACEHOLDER_MODE",
+    "module_grid_cm": 400,
+    "roles": {
+      "wall": "/Game/_PROJECT/MelusinasHouse/SM_wallhi",
+      "column": "/Game/_PROJECT/houseassets/SM_Cube_001",
+      "cornice": "/Game/_PROJECT/houseassets/SM_MarbleSlabOutline",
+      "floor": "/Game/_PROJECT/houseassets/SM_ceilingsquare",
+      "bridge": "/Game/_PROJECT/MelusinasHouse/SM_corridor"
+    },
+    "note": "Weighted collection entries below are ignored during Melodia.BuildAllPCG until art pass disables placeholder mode."
+  },
   "materials": {
     "facade_primary": "/Game/_PROJECT/04_Materials/MooaToon/M_SDF_TrueParallax",
     "facade_gold": "/Game/_PROJECT/04_Materials/MooaToon/M_OilPainting_Gold_Baroque",
@@ -77,6 +89,21 @@
       "entries": [
         { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_surrealtower1", "weight": 1, "tags": ["tower"] },
         { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_surrealtower2", "weight": 1, "tags": ["tower"] }
+      ]
+    },
+    "PCGCol_Environment_Rocks": {
+      "tag": "rock",
+      "entries": [
+        { "mesh": "/Game/AdvWorldInteraction/StarterContent/Props/SM_Rock", "weight": 3, "tags": ["boulder"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_Cube_001", "weight": 1, "tags": ["rock_small"] }
+      ]
+    },
+    "PCGCol_Environment_GroundCover": {
+      "tag": "ground_cover",
+      "entries": [
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallshort", "weight": 2, "tags": ["moss"] },
+        { "mesh": "/Game/_PROJECT/MelusinasHouse/SM_wallshort_001", "weight": 2, "tags": ["moss"] },
+        { "mesh": "/Game/_PROJECT/houseassets/SM_MarbleSlabOutline", "weight": 1, "tags": ["debris"] }
       ]
     }
   },

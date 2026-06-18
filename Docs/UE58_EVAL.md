@@ -82,5 +82,6 @@ Or use `Scripts/Setup/sync-ue58-fork.ps1` from either clone.
 ## Related docs
 
 - `RECOVERY.md` — MooaToon 5.7 build/open (production only)
+- `SDF_TOON58_LOOKDEV.md` — UE 5.8 Substrate Toon look-dev materials + builder script
 - `PCG_SYSTEMS_GUIDE.md` — graph inventory (`PCG_DreamWalls`, Bezier portfolio kit)
 - `PORTFOLIO_PIPELINE.md` — shot list / demo levels

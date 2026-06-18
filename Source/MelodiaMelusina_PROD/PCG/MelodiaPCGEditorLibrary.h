@@ -22,6 +22,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Editor", CallInEditor)
 	static bool BuildAllBezierGraphs();
 
+	/** Run melodia_pcgex_collections.py then melodia_pcgex_builder.py (requires PCGExtendedToolkit). */
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Editor", CallInEditor)
+	static bool BuildAllPCGExGraphs();
+
+	/** DreamWalls + Bezier portfolio graphs (placeholder meshes, no legacy/PCGEx). */
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Editor", CallInEditor)
+	static bool BuildAllPCG();
+
+	/** Alias for BuildAllPCG — portfolio-safe rebuild. */
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Editor", CallInEditor)
+	static bool BuildPortfolioPCG();
+
+	/** Volume/grid scatter graphs under /Game/_PROJECT/PCG/Graphs/Simple/ */
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Editor", CallInEditor)
+	static bool BuildSimplePCGGraphs();
+
 	/** Duplicate greybox test maps for each catalog graph if missing. */
 	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Editor", CallInEditor)
 	static int32 EnsureBezierTestLevels();

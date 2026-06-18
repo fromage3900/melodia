@@ -70,9 +70,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bezier Terrace", meta = (ClampMin = "0"))
 	float RailingHalfWidth = 90.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	FMelodiaPCGTerrainProjection TerrainProjection;
+
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Layout|Presets")
 	void UsePortfolioTerraceDefaults();
 
+protected:
+	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
+
+public:
 	virtual FPCGElementPtr CreateElement() const override;
 };
 

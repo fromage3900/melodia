@@ -4,6 +4,7 @@
 #include "MelodiaPCGBezierMath.h"
 #include "MelodiaPCGBezierHelpers.h"
 #include "MelodiaPCGBezierPresetLibrary.h"
+#include "MelodiaPCGTerrain.h"
 
 #ifndef MELODIA_ENABLE_EXPERIMENTAL_PCG
 #define MELODIA_ENABLE_EXPERIMENTAL_PCG 1
@@ -71,6 +72,11 @@ bool FPCGBezierPathElement::ExecuteInternal(FPCGContext* Context) const
 		Settings->SlopeAngle,
 		Settings->Seed,
 		FTransform::Identity);
+
+	MelodiaPCGTerrain::ApplyToPointData(
+		PointData,
+		MelodiaPCGTerrain::GetWorldFromPCGContext(Context),
+		Settings->TerrainProjection);
 
 	MelodiaPCGBezierHelpers::EmitPointData(Context, PointData, PCGPinConstants::DefaultOutputLabel);
 	return true;

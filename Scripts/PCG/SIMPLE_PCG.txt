@@ -1,0 +1,36 @@
+Melodia Simple PCG — scatter your meshes
+=========================================
+
+Path: /Game/_PROJECT/PCG/Graphs/Simple/
+
+BUILD (editor console):
+  Melodia.BuildSimplePCG
+
+Or Python:
+  py "G:/Melodia/Scripts/PCG/melodia_pcg_simple_builder.py"
+
+USE (no custom kit required):
+  1. Place a PCG Volume in your level
+  2. PCG Component → Graph → pick a Simple graph below
+  3. Resize volume to cover the area you want
+  4. Generate (or enable Generate on Load)
+
+GRAPHS
+------
+Volume voxel (works on flat ground or anywhere):
+  PCG_Simple_WallScatter      — baroque wall modules (400cm spacing)
+  PCG_Simple_ColumnScatter    — columns
+  PCG_Simple_CorniceScatter   — cornice pieces
+  PCG_Simple_TowerScatter     — tower accents (sparse)
+  PCG_Simple_BridgeScatter    — bridge/corridor modules
+
+Fixed grid (module blockout at origin of volume):
+  PCG_Simple_WallGrid         — 400cm wall grid
+  PCG_Simple_ColumnGrid       — 400cm column grid
+
+Landscape (level needs Landscape actor):
+  PCG_Simple_MeadowScatter    — ground cover from catalog
+  PCG_Simple_RockScatter      — rocks on slope
+
+Meshes come from Scripts/PCG/baroque_mesh_catalog.json collections.
+Edit spawner node in graph or catalog JSON, then re-run BuildSimplePCG.

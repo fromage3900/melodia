@@ -10,9 +10,10 @@
 #include "CoreMinimal.h"
 #include "PCGMelodiaAttributes.generated.h"
 
-// PCGExtendedToolkit is not enabled for this project. Define the guard macro so
-// `#if WITH_PCGEX` blocks compile cleanly (avoids C4668 warning-as-error).
-#ifndef WITH_PCGEX
+// Optional PCGEx integration — active when PCGExtendedToolkit is enabled and built.
+#if __has_include("PCGExMeshCollection.h")
+#define WITH_PCGEX 1
+#elif !defined(WITH_PCGEX)
 #define WITH_PCGEX 0
 #endif
 

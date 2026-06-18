@@ -1,0 +1,49 @@
+Melodia PCG — portfolio graphs (placeholder mode)
+=================================================
+Level: /Game/Melodia/Levels/L_MelodiaPortfolioTerrace
+Kit:   MelodiaPCGLevelKit at (0,0,0), Graph Id = Dream Walls
+Manifest: Scripts/PCG/melodia_pcg_library_manifest.json
+
+PORTFOLIO REBUILD (editor console or Output Log Python):
+  Melodia.BuildAllPCG
+  (DreamWalls v2 + 10 Bezier graphs — single greybox mesh per role, scale 1.0)
+
+ONE-CLICK level setup:
+  Melodia.SetupPortfolioPCG
+  or: G:/Melodia/Scripts/PCG/melodia_pcg_portfolio_rebuild.py
+  or: G:/Melodia/Scripts/PCG/_setup_portfolio_hero.py
+
+PLACEHOLDER MESHES (melodia_pcg_standards.py):
+  wall    → SM_wallhi          (400 cm module grid)
+  column  → SM_Cube_001
+  cornice → SM_MarbleSlabOutline
+  scatter → disabled in portfolio mode
+  ornament jitter → locked to 0 in portfolio mode
+
+--- IN LEVEL KIT DROPDOWN (12 graphs, portfolio-ready) ---
+
+PCG_DreamWalls                 ~507 ISM   3-layer Escher greybox (hero)
+PCG_PortfolioTerraceBezier     terrace walk + railings
+PCG_BezierPathPortfolio        path + sweep
+PCG_BezierCloisterRing         courtyard loop
+PCG_BezierColonnadeAvenue      dual column rows
+PCG_BezierGardenPromenade      garden path (no jitter)
+PCG_BezierBridgeSpan           bridge + balustrade
+PCG_BezierCathedralAxis        nave axis
+PCG_BezierVistaTerrace         wide terrace landings
+PCG_BezierOrnamentGallery      gallery path (no jitter)
+PCG_BezierSplineGarden         needs spline tag Melodia.Portfolio.PathSpline
+
+--- REMOVED FROM CATALOG (dead / random meshes / broken) ---
+
+PCG_PortfolioEnvironment       (random rock scatter — disabled)
+PCGEx graphs                   (Melodia.BuildPCGExGraphs — experimental)
+PCG_TerraceGarden classic
+PCG_BaroqueRuins, PCG_Balustrade, forests, meadow, etc.
+
+--- LEGACY VANILLA (not in BuildAllPCG; manual only) ---
+
+PCG_BaroqueColonnade, PCG_CathedralNave, PCG_OvergrownRuins, PCG_GreyboxBlockout
+Run melodia_vanilla_bootstrap.py only if you need volume wiring on these.
+
+Last updated: DreamWalls v2 — 3 orthogonal layers @ 400cm grid

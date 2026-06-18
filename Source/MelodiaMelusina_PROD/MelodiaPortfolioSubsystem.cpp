@@ -47,7 +47,7 @@ void UMelodiaPortfolioSubsystem::TryShowPortfolioPrompt(UWorld* World)
 			-1,
 			30.0f,
 			FColor::Cyan,
-			TEXT("Melodia PCG — PLAY=demo | Melodia.BuildPCGGraphs | Melodia.PlayPortfolioBezier | Place MelodiaPCGLevelKit"));
+			TEXT("Melodia PCG — Melodia.BuildAllPCG | BuildPCGGraphs | BuildPCGExGraphs | PlayPortfolioBezier | MelodiaPCGLevelKit"));
 	}
 }
 

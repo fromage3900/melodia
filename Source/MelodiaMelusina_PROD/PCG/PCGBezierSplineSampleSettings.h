@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "PCGSettings.h"
 #include "PCGElement.h"
+#include "MelodiaBezierTypes.h"
 #include "PCGMelodiaAttributes.h"
 #include "PCGBezierSplineSampleSettings.generated.h"
 
@@ -33,6 +34,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Sample")
 	bool bWalkable = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	FMelodiaPCGTerrainProjection TerrainProjection;
 
 	virtual FPCGElementPtr CreateElement() const override;
 };

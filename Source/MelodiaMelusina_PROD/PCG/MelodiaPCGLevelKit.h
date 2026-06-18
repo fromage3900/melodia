@@ -4,27 +4,23 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+#include "PCGVolume.h"
 #include "MelodiaBezierTypes.h"
 #include "MelodiaPCGLevelKit.generated.h"
 
-class UPCGComponent;
 class UPCGGraph;
 
 UCLASS(Blueprintable, meta = (DisplayName = "Melodia PCG Level Kit"))
-class MELODIAMELUSINA_PROD_API AMelodiaPCGLevelKit : public AActor
+class MELODIAMELUSINA_PROD_API AMelodiaPCGLevelKit : public APCGVolume
 {
 	GENERATED_BODY()
 
 public:
-	AMelodiaPCGLevelKit();
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Melodia|PCG Kit")
-	TObjectPtr<UPCGComponent> PCGComponent;
+	AMelodiaPCGLevelKit(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	/** Catalog graph to assign to this volume. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Kit", meta = (DisplayPriority = 0))
-	EMelodiaPCGGraphId GraphId = EMelodiaPCGGraphId::PortfolioTerraceBezier;
+	EMelodiaPCGGraphId GraphId = EMelodiaPCGGraphId::DreamWalls;
 
 	/** Used when GraphId is Custom. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Kit",
@@ -39,7 +35,11 @@ public:
 
 	/** Hint for which layout preset to use on Bezier nodes inside the graph. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Kit")
-	EMelodiaBezierLayoutPreset SuggestedLayoutPreset = EMelodiaBezierLayoutPreset::PortfolioTerrace;
+	EMelodiaBezierLayoutPreset SuggestedLayoutPreset = EMelodiaBezierLayoutPreset::EscherSwitchback;
+
+	/** Half-extent of the PCG generation volume in cm (full span = 2x). Portfolio graphs use ~±3000 cm. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melodia|PCG Kit", meta = (ClampMin = "100"))
+	FVector GenerationBoundsHalfExtent = FVector(3500.f, 3500.f, 1200.f);
 
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Melodia|PCG Kit")
 	void AssignGraphFromCatalog();
@@ -49,6 +49,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Melodia|PCG Kit")
 	void SyncSuggestedPresetFromCatalog();
+
+	/** Resize the volume brush to match GenerationBoundsHalfExtent. */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Melodia|PCG Kit")
+	void ApplyGenerationBounds();
 
 	UFUNCTION(BlueprintPure, Category = "Melodia|PCG Kit")
 	FSoftObjectPath GetResolvedGraphPath() const;

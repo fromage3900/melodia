@@ -3,6 +3,7 @@
 #include "PCGBezierSweepSettings.h"
 #include "MelodiaPCGBezierMath.h"
 #include "MelodiaPCGBezierHelpers.h"
+#include "MelodiaPCGTerrain.h"
 #include "MelodiaPCGBezierPresetLibrary.h"
 
 #ifndef MELODIA_ENABLE_EXPERIMENTAL_PCG
@@ -128,6 +129,9 @@ bool FPCGBezierSweepElement::ExecuteInternal(FPCGContext* Context) const
 			}
 		}
 	}
+
+	UWorld* World = MelodiaPCGTerrain::GetWorldFromPCGContext(Context);
+	MelodiaPCGTerrain::ApplyToPointData(PointData, World, Settings->TerrainProjection);
 
 	MelodiaPCGBezierHelpers::EmitPointData(Context, PointData, PCGPinConstants::DefaultOutputLabel);
 	return true;

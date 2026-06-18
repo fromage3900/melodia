@@ -52,4 +52,19 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Catalog")
 	static FString GetGraphBuildScriptPath();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Catalog")
+	static FString GetPCGExBuildScriptPath();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Catalog")
+	static FString GetPCGExCollectionsScriptPath();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Catalog")
+	static FString GetDreamWallsBuildScriptPath();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Catalog")
+	static FString GetPortfolioManifestPath();
+
+	UFUNCTION(BlueprintCallable, Category = "Melodia|PCG|Catalog")
+	static FString GetSimplePCGBuildScriptPath();
 };

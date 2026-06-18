@@ -52,6 +52,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bezier Path", meta = (ClampMin = "0", ClampMax = "90"))
 	float SlopeAngle = 0.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	FMelodiaPCGTerrainProjection TerrainProjection;
+
 	/** Load the portfolio hero S-curve terrace anchors. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Layout|Presets")
 	void UsePortfolioTerraceDefaults();

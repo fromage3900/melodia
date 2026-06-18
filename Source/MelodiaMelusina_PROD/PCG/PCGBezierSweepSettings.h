@@ -54,6 +54,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bezier Sweep")
 	bool bWalkable = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	FMelodiaPCGTerrainProjection TerrainProjection;
+
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Layout|Presets")
 	void UsePortfolioTerraceDefaults();
 

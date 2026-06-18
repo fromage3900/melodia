@@ -53,6 +53,36 @@ enum class EMelodiaBezierLayoutPreset : uint8
 	EscherSwitchback UMETA(DisplayName = "Escher Switchback"),
 };
 
+/** Landscape line-trace projection used by Bezier PCG elements and scatter nodes. */
+USTRUCT(BlueprintType)
+struct MELODIAMELUSINA_PROD_API FMelodiaPCGTerrainProjection
+{
+	GENERATED_BODY()
+
+	/** Snap generated XY to landscape height via downward line trace. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	bool bProjectToLandscape = true;
+
+	/** Keep each point's authored Z as an offset above the traced surface (terraces, bridges). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	bool bPreserveDesignHeightOffset = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain", meta = (ClampMin = "0"))
+	float TraceStartOffset = 5000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain", meta = (ClampMin = "0"))
+	float MaxTraceDistance = 15000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	float SurfaceOffset = 5.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	bool bAlignRotationToSurface = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain", meta = (ClampMin = "0", ClampMax = "90"))
+	float MaxWalkableSlopeDegrees = 55.f;
+};
+
 /** Built-in PCG graph catalog IDs for AMelodiaPCGLevelKit dropdowns. */
 UENUM(BlueprintType)
 enum class EMelodiaPCGGraphId : uint8
@@ -67,6 +97,11 @@ enum class EMelodiaPCGGraphId : uint8
 	BezierVistaTerrace UMETA(DisplayName = "Bezier Vista Terrace"),
 	BezierOrnamentGallery UMETA(DisplayName = "Bezier Ornament Gallery"),
 	BezierSplineGarden UMETA(DisplayName = "Bezier Spline Garden"),
+	PortfolioEnvironment UMETA(DisplayName = "Portfolio Environment Scatter"),
+	DreamWalls UMETA(DisplayName = "Dream Walls (Escher)"),
 	TerraceGarden UMETA(DisplayName = "Terrace Garden (classic)"),
+	BaroqueColonnadeEx UMETA(DisplayName = "Baroque Colonnade (PCGEx)"),
+	GothicCorridorEx UMETA(DisplayName = "Gothic Corridor (PCGEx)"),
+	BaroqueAtriumEx UMETA(DisplayName = "Baroque Atrium (PCGEx)"),
 	Custom UMETA(DisplayName = "Custom Graph Asset"),
 };

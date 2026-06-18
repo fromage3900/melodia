@@ -3,6 +3,7 @@
 #include "PCGBezierSplineSampleSettings.h"
 #include "MelodiaPCGBezierMath.h"
 #include "MelodiaPCGBezierHelpers.h"
+#include "MelodiaPCGTerrain.h"
 
 #ifndef MELODIA_ENABLE_EXPERIMENTAL_PCG
 #define MELODIA_ENABLE_EXPERIMENTAL_PCG 1
@@ -89,6 +90,11 @@ bool FPCGBezierSplineSampleElement::ExecuteInternal(FPCGContext* Context) const
 		0.0f,
 		Settings->Seed,
 		FTransform::Identity);
+
+	MelodiaPCGTerrain::ApplyToPointData(
+		PointData,
+		MelodiaPCGTerrain::GetWorldFromPCGContext(Context),
+		Settings->TerrainProjection);
 
 	MelodiaPCGBezierHelpers::EmitPointData(Context, PointData, PCGPinConstants::DefaultOutputLabel);
 	return true;

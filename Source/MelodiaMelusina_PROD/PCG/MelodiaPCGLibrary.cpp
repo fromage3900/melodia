@@ -14,6 +14,50 @@
 #include "Metadata/PCGMetadataAttributeTpl.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "PCGSubsystem.h"
+
+#if WITH_EDITOR
+#include "Editor.h"
+#endif
+
+namespace MelodiaPCGLibraryPrivate
+{
+	bool PumpEditorUntilPCGComplete(UPCGComponent* PCGComponent, float MaxWaitSeconds)
+	{
+		if (!PCGComponent)
+		{
+			return false;
+		}
+
+		const double Deadline = FPlatformTime::Seconds() + static_cast<double>(MaxWaitSeconds);
+		while (FPlatformTime::Seconds() < Deadline)
+		{
+			if (!PCGComponent->IsGenerating())
+			{
+				return true;
+			}
+
+#if WITH_EDITOR
+			if (GEditor)
+			{
+				GEditor->Tick(0.016f, false);
+			}
+#endif
+			if (UWorld* World = PCGComponent->GetWorld())
+			{
+				if (UPCGSubsystem* PCGSubsystem = UPCGSubsystem::GetInstance(World))
+				{
+					PCGSubsystem->Tick(0.016f);
+				}
+			}
+
+			FPlatformProcess::Sleep(0.005f);
+		}
+
+		return !PCGComponent->IsGenerating();
+	}
+}
 
 // ---------------------------------------------------------------------------
 // ExtractPointsFromData — internal helper (shared by GetWalkablePoints/GetAllPoints)
@@ -420,18 +464,48 @@ bool UMelodiaPCGLibrary::AssignGraphToComponent(UPCGComponent* PCGComponent, con
 		return false;
 	}
 
+	if (!Graph->IsStandaloneGraph())
+	{
+		Graph->SetFlags(RF_Transactional);
+		Graph->bIsStandaloneGraph = true;
+		Graph->MarkPackageDirty();
+	}
+
 	PCGComponent->SetGraph(Graph);
 	PCGComponent->Seed = Seed;
 	return true;
 }
 
-bool UMelodiaPCGLibrary::GeneratePCGComponent(UPCGComponent* PCGComponent, bool bForce)
+bool UMelodiaPCGLibrary::GeneratePCGComponent(UPCGComponent* PCGComponent, bool bForce, float MaxWaitSeconds)
 {
 	if (!PCGComponent)
 	{
 		return false;
 	}
 
+	PCGComponent->bActivated = true;
+	PCGComponent->CleanupLocalImmediate(/*bRemoveComponents=*/true);
 	PCGComponent->Generate(bForce);
+	MelodiaPCGLibraryPrivate::PumpEditorUntilPCGComplete(PCGComponent, MaxWaitSeconds);
 	return true;
+}
+
+int32 UMelodiaPCGLibrary::CountInstancedMeshInstances(const AActor* Actor)
+{
+	if (!Actor)
+	{
+		return 0;
+	}
+
+	int32 Total = 0;
+	TArray<UInstancedStaticMeshComponent*> ISMComponents;
+	Actor->GetComponents<UInstancedStaticMeshComponent>(ISMComponents);
+	for (const UInstancedStaticMeshComponent* ISM : ISMComponents)
+	{
+		if (ISM)
+		{
+			Total += ISM->GetInstanceCount();
+		}
+	}
+	return Total;
 }

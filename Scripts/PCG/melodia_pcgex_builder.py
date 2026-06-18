@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 try:
@@ -109,24 +108,52 @@ def add_node_or_fallback(
     return node, settings, used
 
 
+def _main_input_pin(node) -> str:
+    labels = pin_labels(node.get_editor_property("input_pins"))
+    for preferred in ("Paths", "Splines", "Seeds", "Vtx", "Surface", "Volume", "Source", "In"):
+        if preferred in labels:
+            return preferred
+    return labels[0] if labels else "In"
+
+
+def _main_output_pin(node) -> str:
+    labels = pin_labels(node.get_editor_property("output_pins"))
+    for preferred in ("Paths", "Out", "Vtx"):
+        if preferred in labels:
+            return preferred
+    return labels[0] if labels else "Out"
+
+
+def wire_output_to_input(graph, src_node, dst_node) -> None:
+    graph.add_edge(src_node, _main_output_pin(src_node), dst_node, _main_input_pin(dst_node))
+
+
 def wire_chain(graph, nodes: list, output_node) -> None:
-    """Wire Input -> n0 -> n1 -> ... -> Output using standard In/Out pins."""
+    """Wire Input -> n0 -> n1 -> ... -> Output using node-specific pin labels."""
     input_node = graph.get_input_node()
     graph.add_edge(input_node, "In", nodes[0], _main_input_pin(nodes[0]))
     for a, b in zip(nodes, nodes[1:]):
-        graph.add_edge(a, "Out", b, _main_input_pin(b))
-    graph.add_edge(nodes[-1], "Out", output_node, "Out")
+        wire_output_to_input(graph, a, b)
+    graph.add_edge(nodes[-1], _main_output_pin(nodes[-1]), output_node, "Out")
 
 
-def _main_input_pin(node) -> str:
-    labels = pin_labels(node.get_editor_property("input_pins"))
-    if "Surface" in labels:
-        return "Surface"
-    if "Volume" in labels:
-        return "Volume"
-    if "Source" in labels and "In" not in labels:
-        return "Source"
-    return "In"
+def attach_shape_grid_builder(
+    graph,
+    shapes_node,
+    x: int,
+    y: int,
+    cell_cm: float = 400.0,
+) -> unreal.PCGNode:
+    """Wire a 3D grid shape builder into Create Shapes (required for PCGEx output)."""
+    grid_node, grid_settings = add_node(graph, "PCGExCreateShapeGridSettings", x, y)
+    config = grid_settings.get_editor_property("config")
+    res_vec = config.get_editor_property("resolution_vector")
+    res_vec.set_editor_property("constant", unreal.Vector(cell_cm, cell_cm, cell_cm))
+    config.set_editor_property("resolution_vector", res_vec)
+    config.set_editor_property("resolution_mode", unreal.PCGExResolutionMode.FIXED)
+    grid_settings.set_editor_property("config", config)
+    graph.add_edge(grid_node, "Shape Builder", shapes_node, "Shape Builders")
+    return grid_node
 
 
 def mesh_entry(static_mesh_path: str, weight: int = 1):
@@ -190,14 +217,6 @@ def clear_user_nodes(graph) -> None:
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class GraphRecipe:
-    name: str
-    description: str
-    builder: Callable
-    package: str = GRAPH_PACKAGE
-
-
 def build_sub_baroque_spawn(catalog: dict) -> str:
     name = "PCG_Sub_BaroqueSpawn"
     graph, path = create_graph_asset(
@@ -239,13 +258,10 @@ def build_sub_baroque_column(catalog: dict) -> str:
     grid = catalog["module_grid_cm"]
     if hasattr(xform_settings, "set_editor_property"):
         try:
-            xform_settings.set_editor_property("bApplyScale", True)
-            xform_settings.set_editor_property(
-                "ScaleMin", unreal.Vector(1, 1, grid["wall_height"] / 100.0)
-            )
-            xform_settings.set_editor_property(
-                "ScaleMax", unreal.Vector(1, 1, grid["wall_height"] / 100.0)
-            )
+            xform_settings.set_editor_property("uniform_scale", True)
+            xform_settings.set_editor_property("absolute_scale", False)
+            xform_settings.set_editor_property("scale_min", unreal.Vector(0.95, 0.95, 0.95))
+            xform_settings.set_editor_property("scale_max", unreal.Vector(1.05, 1.05, 1.05))
         except Exception:  # noqa: BLE001 — property names differ between PCGEx/vanilla
             pass
 
@@ -327,6 +343,7 @@ def build_colonnade_ex(catalog: dict, sub_column_path: str) -> str:
         500,
         0,
     )
+    attach_shape_grid_builder(graph, shapes_node, 500, 180, float(catalog["module_grid_cm"]["wall_width"]))
 
     break_node, _, _ = add_node_or_fallback(
         graph,
@@ -389,6 +406,7 @@ def build_facade_ex(catalog: dict, sub_spawn_path: str) -> str:
         500,
         0,
     )
+    attach_shape_grid_builder(graph, shapes_node, 500, 180, float(catalog["module_grid_cm"]["wall_width"]))
 
     xform_node, _, _ = add_node_or_fallback(
         graph,
@@ -432,6 +450,13 @@ def build_rotunda_ex(catalog: dict, sub_column_path: str, sub_cornice_path: Opti
         "PCGTransformPointsSettings",
         500,
         0,
+    )
+    attach_shape_grid_builder(
+        graph,
+        shapes_node,
+        500,
+        180,
+        float(catalog["module_grid_cm"]["column_spacing"]),
     )
 
     resample_node, resample_settings, _ = add_node_or_fallback(
@@ -657,6 +682,13 @@ def build_atrium_ex(catalog: dict, sub_column_path: str, sub_spawn_path: str) ->
         "PCGTransformPointsSettings",
         500,
         0,
+    )
+    attach_shape_grid_builder(
+        graph,
+        shapes_node,
+        500,
+        180,
+        float(catalog["module_grid_cm"]["wall_width"]),
     )
 
     col_sg, col_sg_settings = add_node(graph, "PCGSubgraphSettings", 800, 0)

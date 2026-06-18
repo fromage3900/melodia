@@ -181,6 +181,8 @@ namespace MelodiaBezierPresets
 	{
 		switch (GraphId)
 		{
+		case EMelodiaPCGGraphId::DreamWalls:
+			return EMelodiaBezierLayoutPreset::EscherSwitchback;
 		case EMelodiaPCGGraphId::PortfolioTerraceBezier:
 		case EMelodiaPCGGraphId::BezierVistaTerrace:
 			return EMelodiaBezierLayoutPreset::PortfolioTerrace;

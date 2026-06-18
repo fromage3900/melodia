@@ -1,0 +1,146 @@
+{
+  "version": "2026-06-18",
+  "module_grid_cm": 400,
+  "placeholder_mode": true,
+  "rebuild_commands": [
+    "Melodia.BuildAllPCG",
+    "Melodia.SetupPortfolioPCG"
+  ],
+  "rebuild_script": "G:/Melodia/Scripts/PCG/melodia_pcg_portfolio_rebuild.py",
+  "portfolio_level": "/Game/Melodia/Levels/L_MelodiaPortfolioTerrace",
+  "standards_script": "G:/Melodia/Scripts/PCG/melodia_pcg_standards.py",
+  "graphs": [
+    {
+      "id": "DreamWalls",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_DreamWalls",
+      "builder": "melodia_dreamwalls_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Escher",
+      "expected_ism": 507,
+      "expected_ism_note": "3 layers × 13×13 grid @ 400cm cell, 2400cm half-extent",
+      "description": "Hero Escher wall field — SM_wallhi, 0°/90°/180° planes, scale 1.0"
+    },
+    {
+      "id": "PortfolioTerraceBezier",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_PortfolioTerraceBezier",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "description": "Terrace walk + landings + railings; preset spacing locked in portfolio mode"
+    },
+    {
+      "id": "BezierPathPortfolio",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_BezierPathPortfolio",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "description": "Arc-length path with railing sweep — greybox placeholders only"
+    },
+    {
+      "id": "BezierCloisterRing",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_BezierCloisterRing",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "description": "Closed courtyard loop with columns at 400cm module spacing"
+    },
+    {
+      "id": "BezierColonnadeAvenue",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_BezierColonnadeAvenue",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "description": "Dual column rows on grand axis — SM_Cube_001 placeholders"
+    },
+    {
+      "id": "BezierGardenPromenade",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_BezierGardenPromenade",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "description": "Garden path; ornament jitter disabled in portfolio mode"
+    },
+    {
+      "id": "BezierBridgeSpan",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_BezierBridgeSpan",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "description": "Elevated bridge + balustrade sweep"
+    },
+    {
+      "id": "BezierCathedralAxis",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_BezierCathedralAxis",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "description": "Nave axis with 400cm column spacing and cornice sweep"
+    },
+    {
+      "id": "BezierVistaTerrace",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_BezierVistaTerrace",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "description": "Wide terrace landings for hero vista shots"
+    },
+    {
+      "id": "BezierOrnamentGallery",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_BezierOrnamentGallery",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "description": "Gallery ornament path; zero jitter in portfolio mode"
+    },
+    {
+      "id": "BezierSplineGarden",
+      "asset": "/Game/_PROJECT/PCG/Graphs/PCG_BezierSplineGarden",
+      "builder": "melodia_pcg_bezier_builder.py",
+      "status": "portfolio-ready",
+      "aesthetic_role": "Nikki",
+      "expected_ism": "variable",
+      "requires": "Level spline tagged Melodia.Portfolio.PathSpline",
+      "description": "Art-direct path from level spline — no scatter noise in portfolio mode"
+    }
+  ],
+  "experimental": [
+    {
+      "id": "PortfolioEnvironment",
+      "status": "disabled",
+      "reason": "Random rock scatter removed from BuildAllPCG"
+    },
+    {
+      "id": "PCGEx/EscherNikki",
+      "status": "experimental",
+      "build_command": "Melodia.BuildPCGExGraphs",
+      "reason": "Requires PCGExtendedToolkit; not in default portfolio rebuild"
+    },
+    {
+      "id": "LegacyVanilla",
+      "assets": [
+        "PCG_BaroqueColonnade",
+        "PCG_CathedralNave",
+        "PCG_OvergrownRuins",
+        "PCG_GreyboxBlockout"
+      ],
+      "status": "legacy",
+      "build_script": "melodia_vanilla_bootstrap.py"
+    }
+  ],
+  "placeholders": {
+    "wall": "/Game/_PROJECT/MelusinasHouse/SM_wallhi",
+    "column": "/Game/_PROJECT/houseassets/SM_Cube_001",
+    "cornice": "/Game/_PROJECT/houseassets/SM_MarbleSlabOutline",
+    "floor": "/Game/_PROJECT/houseassets/SM_ceilingsquare",
+    "bridge": "/Game/_PROJECT/MelusinasHouse/SM_corridor"
+  }
+}

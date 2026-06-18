@@ -165,6 +165,18 @@
 			"Enabled": true
 		},
 		{
+			"Name": "GeometryScripting",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGGeometryScriptInterop",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGExtendedToolkit",
+			"Enabled": true
+		},
+		{
 			"Name": "PCGFastGeoInterop",
 			"Enabled": true
 		},
@@ -227,7 +239,7 @@
 		},
 		{
 			"Name": "VRM4U",
-			"Enabled": true
+			"Enabled": false
 		}
 	]
 }

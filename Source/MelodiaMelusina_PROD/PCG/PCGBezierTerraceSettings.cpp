@@ -3,6 +3,7 @@
 #include "PCGBezierTerraceSettings.h"
 #include "MelodiaPCGBezierMath.h"
 #include "MelodiaPCGBezierHelpers.h"
+#include "MelodiaPCGTerrain.h"
 #include "MelodiaPCGBezierPresetLibrary.h"
 
 #ifndef MELODIA_ENABLE_EXPERIMENTAL_PCG
@@ -14,6 +15,33 @@
 #include "PCGContext.h"
 #include "PCGPin.h"
 #include "Data/PCGPointData.h"
+
+namespace MelodiaPCGBezierSettingsPrivate
+{
+	static TArray<FPCGPinProperties> MakeSeparatePointPins(const TArray<FName>& Labels)
+	{
+		TArray<FPCGPinProperties> Pins;
+		Pins.Reserve(Labels.Num());
+		for (const FName& Label : Labels)
+		{
+			Pins.Emplace(Label, FPCGDataTypeIdentifier(EPCGDataType::Point));
+		}
+		return Pins;
+	}
+}
+
+TArray<FPCGPinProperties> UPCGBezierTerraceSettings::OutputPinProperties() const
+{
+	if (bEmitSeparatePins)
+	{
+		return MelodiaPCGBezierSettingsPrivate::MakeSeparatePointPins({
+			TEXT("Out_Path"),
+			TEXT("Out_Terrace"),
+			TEXT("Out_Railing"),
+		});
+	}
+	return Super::DefaultPointOutputPinProperties();
+}
 
 UPCGBezierTerraceSettings::UPCGBezierTerraceSettings()
 {
@@ -211,6 +239,14 @@ bool FPCGBezierTerraceElement::ExecuteInternal(FPCGContext* Context) const
 				}
 			}
 		}
+	}
+
+	UWorld* World = MelodiaPCGTerrain::GetWorldFromPCGContext(Context);
+	MelodiaPCGTerrain::ApplyToPointData(PathData, World, Settings->TerrainProjection);
+	MelodiaPCGTerrain::ApplyToPointData(TerraceData, World, Settings->TerrainProjection);
+	if (RailingData)
+	{
+		MelodiaPCGTerrain::ApplyToPointData(RailingData, World, Settings->TerrainProjection);
 	}
 
 	if (Settings->bEmitSeparatePins)

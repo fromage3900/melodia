@@ -20,6 +20,8 @@
 #include "MelodiaRestPoint.h"
 #include "MelodiaPortal.h"
 #include "MelodiaReverieRunManager.h"
+#include "MelodiaPCGLevelKit.h"
+#include "MelodiaBezierTypes.h"
 #include "Engine/Blueprint.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/SkyLight.h"
@@ -731,7 +733,30 @@ bool UMelodiaEditorContentBootstrap::RepopulatePortfolioTerraceLevel()
 		}
 	}
 
-	if (!bTouched)
+	bool bHasLevelKit = false;
+	for (TActorIterator<AMelodiaPCGLevelKit> It(World); It; ++It)
+	{
+		It->Destroy();
+		bTouched = true;
+	}
+
+	if (AMelodiaPCGLevelKit* Kit = World->SpawnActor<AMelodiaPCGLevelKit>(
+		AMelodiaPCGLevelKit::StaticClass(),
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		Params))
+	{
+		Kit->SetActorLabel(TEXT("MelodiaPCG_PortfolioKit"));
+		Kit->GraphId = EMelodiaPCGGraphId::DreamWalls;
+		Kit->GenerationSeed = 42;
+		Kit->GenerationBoundsHalfExtent = FVector(3500.f, 3500.f, 1200.f);
+		Kit->ApplyGenerationBounds();
+		Kit->GenerateNow();
+		bHasLevelKit = true;
+		bTouched = true;
+	}
+
+	if (!bHasLevelKit)
 	{
 		return false;
 	}

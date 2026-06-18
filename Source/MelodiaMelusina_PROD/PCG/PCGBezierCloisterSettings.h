@@ -53,6 +53,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bezier Cloister")
 	bool bPlaceCornerColumns = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	FMelodiaPCGTerrainProjection TerrainProjection;
+
+protected:
+	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
+
+public:
 	virtual FPCGElementPtr CreateElement() const override;
 };
 

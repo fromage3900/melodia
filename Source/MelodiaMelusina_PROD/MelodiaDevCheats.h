@@ -20,4 +20,8 @@ namespace MelodiaDevCheats
 	void PlayPCGDemo(UWorld* World);
 	void PlayPortfolioBezier(UWorld* World);
 	void BuildPCGGraphs();
+	void BuildPCGExGraphs();
+	void BuildAllPCG();
+	void BuildSimplePCG();
+	void SetupPortfolioPCG();
 }

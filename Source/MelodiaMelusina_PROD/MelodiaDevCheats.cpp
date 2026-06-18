@@ -16,7 +16,11 @@
 #include "MelodiaMenuBridgeLibrary.h"
 
 #if WITH_EDITOR
+#include "Editor.h"
 #include "MelodiaPCGEditorLibrary.h"
+#include "MelodiaEditorContentBootstrap.h"
+#include "MelodiaPCGLevelKit.h"
+#include "MelodiaPCGLibrary.h"
 #endif
 #include "MelodiaMechanicProgressionSubsystem.h"
 #include "MelodiaRhythmGameModeBase.h"
@@ -233,6 +237,67 @@ void MelodiaDevCheats::BuildPCGGraphs()
 #endif
 }
 
+void MelodiaDevCheats::BuildPCGExGraphs()
+{
+#if WITH_EDITOR
+	UMelodiaPCGEditorLibrary::PrintPCGGraphCatalogHelp();
+	if (UMelodiaPCGEditorLibrary::BuildAllPCGExGraphs())
+	{
+		UMelodiaPCGEditorLibrary::EnsureBezierTestLevels();
+	}
+#else
+	UE_LOG(LogTemp, Warning, TEXT("Melodia.BuildPCGExGraphs is editor-only."));
+#endif
+}
+
+void MelodiaDevCheats::BuildAllPCG()
+{
+#if WITH_EDITOR
+	UMelodiaPCGEditorLibrary::PrintPCGGraphCatalogHelp();
+	UMelodiaPCGEditorLibrary::BuildAllPCG();
+#else
+	UE_LOG(LogTemp, Warning, TEXT("Melodia.BuildAllPCG is editor-only."));
+#endif
+}
+
+void MelodiaDevCheats::BuildSimplePCG()
+{
+#if WITH_EDITOR
+	if (UMelodiaPCGEditorLibrary::BuildSimplePCGGraphs())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Melodia.BuildSimplePCG OK — /Game/_PROJECT/PCG/Graphs/Simple/"));
+	}
+#else
+	UE_LOG(LogTemp, Warning, TEXT("Melodia.BuildSimplePCG is editor-only."));
+#endif
+}
+
+void MelodiaDevCheats::SetupPortfolioPCG()
+{
+#if WITH_EDITOR
+	if (!UMelodiaEditorContentBootstrap::RepopulatePortfolioTerraceLevel())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Melodia.SetupPortfolioPCG failed — could not repopulate L_MelodiaPortfolioTerrace."));
+		return;
+	}
+
+	UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+	if (!World)
+	{
+		return;
+	}
+
+	for (TActorIterator<AMelodiaPCGLevelKit> It(World); It; ++It)
+	{
+		const int32 ISMCount = UMelodiaPCGLibrary::CountInstancedMeshInstances(*It);
+		UE_LOG(LogTemp, Display, TEXT("Melodia.SetupPortfolioPCG OK — %s at %s, ISM instances=%d. Fly camera to (0,0,0)."),
+			*It->GetActorLabel(), *It->GetActorLocation().ToString(), ISMCount);
+	}
+#else
+	UE_LOG(LogTemp, Warning, TEXT("Melodia.SetupPortfolioPCG is editor-only."));
+#endif
+}
+
 void MelodiaDevCheats::RegisterConsoleCommands()
 {
 	using namespace MelodiaDevCheatsPrivate;
@@ -292,8 +357,32 @@ void MelodiaDevCheats::RegisterConsoleCommands()
 
 	IConsoleManager::Get().RegisterConsoleCommand(
 		TEXT("Melodia.BuildPCGGraphs"),
-		TEXT("Build all Melodia Bezier PCG graphs from catalog (editor only; requires Python plugin)."),
+		TEXT("Build all Melodia Bezier PCG graphs (editor only; requires Python plugin)."),
 		FConsoleCommandDelegate::CreateStatic(&MelodiaDevCheats::BuildPCGGraphs),
+		ECVF_Default);
+
+	IConsoleManager::Get().RegisterConsoleCommand(
+		TEXT("Melodia.BuildPCGExGraphs"),
+		TEXT("Build PCGEx mesh collections and *Ex baroque graphs (editor only; requires PCGExtendedToolkit)."),
+		FConsoleCommandDelegate::CreateStatic(&MelodiaDevCheats::BuildPCGExGraphs),
+		ECVF_Default);
+
+	IConsoleManager::Get().RegisterConsoleCommand(
+		TEXT("Melodia.BuildSimplePCG"),
+		TEXT("Build simple volume/grid scatter graphs (editor only). See Scripts/PCG/SIMPLE_PCG.txt"),
+		FConsoleCommandDelegate::CreateStatic(&MelodiaDevCheats::BuildSimplePCG),
+		ECVF_Default);
+
+	IConsoleManager::Get().RegisterConsoleCommand(
+		TEXT("Melodia.BuildAllPCG"),
+		TEXT("Build Bezier + PCGEx collections + PCGEx graphs (editor only)."),
+		FConsoleCommandDelegate::CreateStatic(&MelodiaDevCheats::BuildAllPCG),
+		ECVF_Default);
+
+	IConsoleManager::Get().RegisterConsoleCommand(
+		TEXT("Melodia.SetupPortfolioPCG"),
+		TEXT("Load portfolio level, spawn DreamWalls LevelKit at origin, generate, save."),
+		FConsoleCommandDelegate::CreateStatic(&MelodiaDevCheats::SetupPortfolioPCG),
 		ECVF_Default);
 
 	UE_LOG(LogTemp, Log, TEXT("Melodia dev cheats registered (~ key console in PIE)."));
