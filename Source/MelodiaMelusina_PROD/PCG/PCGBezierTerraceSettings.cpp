@@ -16,7 +16,7 @@
 #include "PCGPin.h"
 #include "Data/PCGPointData.h"
 
-namespace MelodiaPCGBezierSettingsPrivate
+namespace MelodiaPCGBezierTerraceSettingsPrivate
 {
 	static TArray<FPCGPinProperties> MakeSeparatePointPins(const TArray<FName>& Labels)
 	{
@@ -34,7 +34,7 @@ TArray<FPCGPinProperties> UPCGBezierTerraceSettings::OutputPinProperties() const
 {
 	if (bEmitSeparatePins)
 	{
-		return MelodiaPCGBezierSettingsPrivate::MakeSeparatePointPins({
+		return MelodiaPCGBezierTerraceSettingsPrivate::MakeSeparatePointPins({
 			TEXT("Out_Path"),
 			TEXT("Out_Terrace"),
 			TEXT("Out_Railing"),

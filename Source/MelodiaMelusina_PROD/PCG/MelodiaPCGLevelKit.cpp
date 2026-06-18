@@ -104,7 +104,14 @@ void AMelodiaPCGLevelKit::OnConstruction(const FTransform& Transform)
 #if WITH_EDITOR
 	if (PCGComponent && GetWorld() && !GetWorld()->IsGameWorld())
 	{
-		UMelodiaPCGLibrary::GeneratePCGComponent(PCGComponent, true);
+		// MaxWaitSeconds = 0: kick generation but DO NOT pump the editor from here.
+		// OnConstruction runs inside actor construction / FEditorFileUtils::LoadMap. The
+		// synchronous pump (GEditor->Tick() inside GeneratePCGComponent) re-enters the frame
+		// loop and trips the fatal assertion "Begin dynamic resolution event should be fired
+		// exactly once" (UnrealEngine.cpp) — which was crashing the editor on every startup
+		// when the content bootstrap auto-loaded PCG levels. PCG still completes asynchronously
+		// via its own subsystem tick. Explicit, user-driven generation (GenerateNow) still pumps.
+		UMelodiaPCGLibrary::GeneratePCGComponent(PCGComponent, true, 0.f);
 	}
 #endif
 }

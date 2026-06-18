@@ -38,12 +38,13 @@ namespace MelodiaPCGLibraryPrivate
 				return true;
 			}
 
-#if WITH_EDITOR
-			if (GEditor)
-			{
-				GEditor->Tick(0.016f, false);
-			}
-#endif
+			// NOTE: Do NOT call GEditor->Tick() here. This pump is reached from contexts that are
+			// already inside an engine/editor frame — AActor::OnConstruction during FEditorFileUtils::LoadMap,
+			// the editor-startup content bootstrap ticker, etc. Re-entering GEditor->Tick() emits a nested
+			// EDynamicResolutionStateEvent::BeginFrame and trips the fatal "Begin dynamic resolution event
+			// should be fired exactly once" assert (UnrealEngine.cpp), which crashed the editor on every
+			// startup. Ticking only the PCG subsystem advances generation to completion (worker-thread tasks
+			// progress regardless) without re-entering the frame loop.
 			if (UWorld* World = PCGComponent->GetWorld())
 			{
 				if (UPCGSubsystem* PCGSubsystem = UPCGSubsystem::GetInstance(World))
